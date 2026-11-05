@@ -1,0 +1,16 @@
+{
+  "name": "町の道順",
+  "short_name": "町の道順",
+  "description": "地図で見た道順を覚えて、同じ道をたどる頭の体操",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef0e4",
+  "theme_color": "#eef0e4",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
