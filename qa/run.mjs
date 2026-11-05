@@ -96,7 +96,7 @@ const html = readFileSync(path.join(root, "index.html"), "utf8"), genSrc = readF
   const shell = JSON.parse(sw.match(/SHELL = (\[[^\]]+\])/)[1]);
   check("PWA：sw.js は画面のファイルを全部保存し（gen.js・transfer.js も）、外へ何も送らない", ["./index.html", "./gen.js", "./transfer.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"].every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
   check("PWA：manifest にアイコン2つと名前がある", mf.name === "町の道順" && mf.icons.length >= 2 && mf.start_url === "./");
-  check("引き継ぎ：transfer.js を index.html の head に置き、記録のキーと a11y-v1 だけを移す", /<script src="transfer\.js" data-game="machi-michijun" data-keys="michijun-v1,michijun-fs,a11y-v1"><\/script>/.test(html) && html.indexOf("transfer.js") < html.indexOf("</head>") && /data-hk/.test(html));
+  check("引き継ぎ：transfer.js を index.html の head に置き、記録のキーだけを移す（a11y-v1 はゲームどうしで分け合うので入れない）", /<script src="transfer\.js" data-game="machi-michijun" data-keys="michijun-v1,michijun-fs"><\/script>/.test(html) && html.indexOf("transfer.js") < html.indexOf("</head>") && /data-hk/.test(html));
 }
 
 // 3. ブラウザで遊ぶ（同じサイトから配る。引き継ぎの QR の URL も確かめるため）
