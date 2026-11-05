@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'">
+<title>町の道順</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="地図で見た道順を覚えて、同じ道をたどる頭の体操。大きな文字・押すだけ・時間制限なし。">
+<meta name="theme-color" content="#eef0e4">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="町の道順">
+<meta property="og:title" content="町の道順：見た道を、覚えてたどれる？">
+<meta property="og:description" content="目印の角で右へ、左へ。だれでも同じ1日3本の道。大きな文字・押すだけ・時間制限なし。">
+<meta property="og:url" content="https://satou-aaaaa.github.io/machi-michijun/">
+<meta property="og:image" content="https://satou-aaaaa.github.io/machi-michijun/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="町の道順：地図で見た道順を覚えてたどるゲーム">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+/* 町内の案内図：生成りの地、うすい緑の区画、灰色の道、赤い道順の線。高齢の人も読みやすい大きな文字と、はっきりした色の差 */
+:root{
+  --bg:#eef0e4; --paper:#fffdf6; --ink:#232a24; --ink2:#4f5a51; --line:#232a2426;
+  --road:#c9cbc0; --road2:#b3b5aa; --block:#dfe9d2; --block2:#c7d8b5;
+  --route:#c8402b; --route2:#8f2d1d; --walk:#1f6b45; --walk2:#164d32; --blue:#2c5d8f; --gold:#b9800f;
+  --ok:#2e7d4f; --ok2:#1f5a38; --red:#c2452d; --red2:#8f2f1e;
+  --f-body:"Zen Maru Gothic","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  color-scheme:light;
+}
+html.fs1{font-size:18px}html.fs2{font-size:21px}html.fs3{font-size:24px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-weight:500;overflow-x:clip;-webkit-tap-highlight-color:transparent;line-height:1.6}
+.wrap{max-width:520px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 32px;display:flex;flex-direction:column;gap:14px;min-height:100vh;min-height:100dvh;box-sizing:border-box}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:52px}
+h1{font-weight:900;font-size:1.15rem;margin:0;letter-spacing:.04em;flex:1;min-width:0}
+h1 small{display:block;font-size:.75rem;letter-spacing:0;color:var(--ink2);font-weight:500;line-height:1.3}
+.icon{all:unset;cursor:pointer;font-size:1.2rem;min-width:52px;height:52px;display:grid;place-items:center;border-radius:12px;border:2px solid var(--line);box-sizing:border-box;padding:0 10px;background:var(--paper);font-weight:700}
+button.main{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:64px;border-radius:16px;background:var(--route);color:#fff;font-weight:900;font-size:1.1rem;padding:8px 18px;text-align:center;box-shadow:0 5px 0 var(--route2);line-height:1.35;flex-wrap:wrap}
+button.main:active{transform:translateY(3px);box-shadow:0 2px 0 var(--route2)}
+button.main.alt{background:var(--blue);box-shadow:0 5px 0 #1d3d5e}
+button.main.ok{background:var(--ok);box-shadow:0 5px 0 var(--ok2)}
+button.main small{font-weight:700;font-size:.8rem}
+button.sub{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:56px;border-radius:14px;border:2px solid var(--line);background:var(--paper);color:var(--ink);font-weight:700;font-size:.95rem;padding:4px 12px;text-align:center;line-height:1.3}
+button.sub:disabled,button.main:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:10px}.row>.sub,.row>.main{flex:1 1 0}
+.note{color:var(--ink2);font-size:.85rem;line-height:1.7;margin:0;text-align:center}
+.note a,.about a{color:var(--route2);display:inline-flex;align-items:center;min-height:44px}
+.big{font-weight:900;font-size:1.3rem;text-align:center;margin:0;line-height:1.4}
+.step{display:flex;gap:6px;justify-content:center;font-size:.8rem;color:var(--ink2);flex-wrap:wrap}
+.step span{padding:2px 10px;border-radius:99px;border:1.5px solid var(--line)}
+.step span.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.step span.done{background:var(--block);border-color:var(--ok)}
+/* 地図 */
+.map{position:relative;width:100%;background:var(--road);border-radius:14px;border:3px solid var(--road2);box-sizing:border-box;overflow:hidden;touch-action:manipulation;--cell:56px}
+.map .blk{position:absolute;box-sizing:border-box;background:var(--block);border:2px solid var(--block2);border-radius:8px;display:grid;place-items:center;font-size:calc(var(--cell) * .42);line-height:1}
+.map .blk.home{background:#f6e3c8;border-color:#d9b98a}
+.map .blk.ring{outline:4px solid var(--gold);outline-offset:-1px;z-index:1}
+.map .blk.goal{background:#fbe0da;border-color:var(--route)}
+.map .blk .flag{position:absolute;right:-4px;top:-8px;font-size:calc(var(--cell) * .3)}
+.map svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.map .rt{fill:none;stroke:var(--route);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.map .wk{fill:none;stroke:var(--walk);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:3.2 2}
+.map .nd{all:unset;position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;cursor:pointer;display:grid;place-items:center;z-index:3}
+.map .nd::before{content:"";width:14px;height:14px;border-radius:50%;background:#fff;border:2.5px solid var(--ink2);box-sizing:border-box}
+.map .nd.here::before{display:none}
+.map .nd.past::before{background:var(--walk);border-color:var(--walk2)}
+.map .nd.ng{animation:shake .4s}
+.map .nd.ng::after{content:"✕";position:absolute;font-size:22px;font-weight:900;color:var(--red2)}
+.map .nd.glow::before{width:26px;height:26px;background:#ffe7a3;border:4px solid var(--gold);animation:glow 1.1s ease-in-out 3}
+.map .who{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;display:grid;place-items:center;font-size:28px;z-index:4;pointer-events:none;transition:left .3s,top .3s;filter:drop-shadow(0 2px 2px #0005)}
+.map .lbl{position:absolute;z-index:2;font-size:.7rem;font-weight:900;background:var(--ink);color:#fff;border-radius:6px;padding:0 5px;transform:translate(-50%,-150%);white-space:nowrap;pointer-events:none}
+@keyframes glow{50%{box-shadow:0 0 0 8px #ffe7a399}}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.ways{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;counter-reset:w}
+.ways li{display:flex;align-items:center;gap:10px;background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:6px 12px;font-weight:700;font-size:1.05rem;counter-increment:w}
+.ways li::before{content:counter(w);display:grid;place-items:center;min-width:1.6rem;height:1.6rem;border-radius:50%;background:var(--ink);color:#fff;font-size:.85rem}
+.ways li .e{font-size:1.4rem}
+.ways li b{color:var(--route2)}
+.tip{background:var(--paper);border:2px dashed var(--gold);border-radius:14px;padding:.7rem 1rem;font-size:.9rem;line-height:1.7}
+.tip b{color:var(--route2)}
+.tip .ex{display:block;margin-top:.3rem;font-size:1.05rem;font-weight:700;color:var(--ink)}
+.msg{min-height:1.6rem;text-align:center;font-weight:700;font-size:1rem}
+.msg.ok{color:var(--ok2)}.msg.ng{color:var(--red2)}
+.hint{background:#fff7d6;border:2px solid var(--gold);border-radius:14px;padding:.6rem 1rem;font-size:.95rem;text-align:center}
+/* 思い出し */
+.shelf{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 8px}
+.item{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:5.6rem;padding:8px 2px 10px;border-radius:12px;background:var(--paper);border:2px solid var(--line);box-shadow:0 4px 0 #232a2422;text-align:center}
+.item .e{font-size:2.1rem;line-height:1.1}
+.item .n{font-size:min(.8rem,3.8vw);font-weight:700;line-height:1.25;word-break:break-all}
+.item.got{outline:4px solid var(--ok);outline-offset:-2px}
+.item.got::after{content:"✓";position:absolute;top:2px;right:6px;font-size:1.2rem;font-weight:900;color:var(--ok)}
+.item.ng{opacity:.5}
+.item.ng::after{content:"✕";position:absolute;top:2px;right:6px;font-size:1.2rem;font-weight:900;color:var(--red)}
+.item.sel{outline:4px solid var(--blue);outline-offset:-2px;transform:translateY(-3px)}
+.item.sel::after{content:"●";position:absolute;top:2px;right:6px;font-size:.9rem;color:var(--blue)}
+.item.miss{outline:4px dashed var(--red);outline-offset:-2px}
+/* 結果・ホーム */
+.verdict{background:var(--paper);border:2px solid var(--ink);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 0 #232a2426}
+.stars{color:var(--gold);letter-spacing:.1em;font-size:1.3rem}
+.stars .off{color:#232a2433}
+.title{font-weight:900;font-size:2.3rem;letter-spacing:.1em;text-align:center;margin:4px 0 0;line-height:1.2}
+.lead{text-align:center;color:var(--ink2);margin:0;font-size:.95rem;line-height:1.8}
+.hero{display:flex;justify-content:center;gap:.2rem;font-size:min(2rem,9vw);align-items:center;flex-wrap:wrap}
+.hero i{font-style:normal;color:var(--route);font-weight:900;font-size:1.3rem}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats div{background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:8px 4px;text-align:center}
+.stats b{display:block;font-size:1.3rem}
+.stats small{color:var(--ink2);font-size:.75rem}
+.share{background:var(--paper);border-radius:14px;padding:12px;white-space:pre-line;font-size:1rem;line-height:1.7;text-align:center;border:2px solid var(--line)}
+.shares{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.shares a,.shares button{display:flex;align-items:center;justify-content:center;min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--paper);color:var(--ink);font-size:.9rem;font-weight:700;text-decoration:none;padding:0 6px;box-sizing:border-box;font-family:inherit;cursor:pointer}
+.rlist{display:flex;flex-direction:column;gap:8px}
+.rlist div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:8px 12px}
+.rlist .x{font-size:1.3rem;min-width:2.2rem;text-align:center}
+.rlist .w{flex:1 1 11rem;font-size:.85rem;color:var(--ink2);line-height:1.5;min-width:0}
+.rlist .w b{color:var(--ink);font-size:.95rem}
+.fsrow{display:flex;gap:6px;align-items:center;justify-content:center;font-size:.85rem;color:var(--ink2)}
+.fsrow button{all:unset;box-sizing:border-box;cursor:pointer;min-width:52px;min-height:48px;display:grid;place-items:center;border-radius:10px;border:2px solid var(--line);background:var(--paper);font-weight:900;color:var(--ink)}
+.fsrow button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.lens{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dex{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dex div{min-height:4.6rem;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;background:var(--paper);border:2px solid var(--line);text-align:center;padding:4px 2px}
+.dex div .e{font-size:1.6rem;line-height:1.2}.dex div small{font-size:min(.75rem,3.4vw);line-height:1.25;word-break:break-all}
+.dex div.no{border-style:dashed}.dex div.no .e{filter:grayscale(1);opacity:.35}
+.dex div b{font-size:.7rem;color:var(--ink2)}
+.agrp{font-size:.85rem;color:var(--ink2);margin:4px 0 -6px;font-weight:700;letter-spacing:.1em}
+.alist{display:flex;flex-direction:column;gap:8px}
+.ach{display:grid;grid-template-columns:2rem 1fr auto;grid-template-areas:"ic nm pg" "ic cd cd" "ic br br";align-items:center;gap:3px 10px;background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:8px 12px}
+.ach .ic{grid-area:ic;font-size:1.3rem;text-align:center}
+.ach b{grid-area:nm;font-size:1rem}.ach small{grid-area:cd;color:var(--ink2);font-size:.8rem;line-height:1.45}
+.ach .pg{grid-area:pg;font-size:.85rem;color:var(--ink2);white-space:nowrap;font-weight:700}
+.ach .bar{grid-area:br;height:6px;border-radius:3px;background:var(--line);overflow:hidden}.ach .bar i{display:block;height:100%;background:var(--ok)}
+.ach.got{background:var(--block);border-color:var(--ok)}
+.ach:not(.got) .ic{filter:grayscale(1);opacity:.5}
+.achnext{text-align:center;font-size:.9rem;color:var(--ink2);margin:0}
+.achnew{text-align:center;font-size:.95rem;font-weight:700;color:var(--route2);margin:0}
+.badge{background:var(--route);color:#fff;border-radius:9px;padding:1px 7px;font-size:.75rem}
+.calnav{display:flex;align-items:center;gap:8px}.calnav b{flex:1;text-align:center;font-size:1.1rem}.calnav .sub{flex:0 0 72px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .wd{font-size:.7rem;color:var(--ink2);text-align:center}
+.cal .c{all:unset;box-sizing:border-box;min-height:48px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.9rem;font-weight:700;background:var(--paper);border:1.5px solid var(--line);position:relative;line-height:1.1}
+.cal .c i{font-style:normal;font-size:.55rem;color:var(--gold)}
+.cal .c.p1{background:#f1ead2}.cal .c.p2{background:#e5d9a8}.cal .c.p3{background:var(--ok);color:#fff;border-color:var(--ok2)}.cal .c.p3 i{color:#ffe9a8}
+.cal .c.late{background:transparent;border:2px dashed var(--ok);color:var(--ok2)}
+.cal .c.miss{cursor:pointer;border:2px dashed var(--red);color:var(--red2);background:#fff}
+.cal .c.miss i{color:var(--red2)}
+.cal .c.today{border:2.5px solid var(--ink)}
+.cal .c .hd{position:absolute;right:2px;top:1px;font-size:.55rem;color:var(--red2);font-weight:900}
+.cal .c.p3 .hd{color:#ffe9a8}
+.cal .c.off{visibility:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;font-size:.75rem;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:4px}.legend em{display:inline-block;width:14px;height:14px;border-radius:4px;font-style:normal}
+.about{background:var(--paper);border:2px solid var(--line);border-radius:14px;padding:12px 14px;font-size:.88rem;line-height:1.8}
+.about h3{margin:.2rem 0 .3rem;font-size:1rem}
+.about p{margin:0 0 .6rem}
+.about ul{margin:0 0 .6rem;padding-left:1.2em}
+dialog#howto{border:none;border-radius:18px;background:var(--paper);color:var(--ink);max-width:440px;width:calc(100% - 32px);padding:20px;box-sizing:border-box;max-height:calc(100% - 32px);overflow:auto}
+dialog#howto::backdrop{background:#000000aa}
+dialog#howto h2{margin:0 0 10px;letter-spacing:.1em}
+dialog#howto ol{padding-left:1.3em;margin:0 0 12px;line-height:1.9;font-size:1rem}
+dialog#howto p{margin:0 0 10px;font-size:.9rem;line-height:1.7;color:var(--ink2)}
+dialog#howto a{color:var(--route2);min-height:44px;display:inline-flex;align-items:center}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:700;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center;font-size:1rem}
+footer{margin-top:auto;text-align:center;font-size:.8rem;color:var(--ink2);display:flex;gap:4px 16px;justify-content:center;flex-wrap:wrap}
+footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:center}
+.life{font-size:1.2rem;letter-spacing:2px}.life .off{opacity:.25}
+/* 色の見分けを助ける：道順の線は青と橙に替え、たどった線は点線のまま（線の形でも分かる） */
+html.a11y-cvd{--route:#a34a00;--route2:#6b3300;--walk:#1f5fa8;--walk2:#143f70;--ok:#1f5fa8;--ok2:#143f70}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* all:unset のボタンでも、キーボードで選んだときの枠が消えないよう、いちばん最後に強く書く */
+:is(.icon,button,a):focus-visible{outline:3px solid var(--blue)!important;outline-offset:2px}
+</style>
+<script src="transfer.js" data-game="machi-michijun" data-keys="michijun-v1,michijun-fs,a11y-v1"></script>
+<!-- a11y:begin 見やすさの設定 v3（shared-workflows template/a11y/a11y.html の写し。ここでは直さず、ひな形を直して全部のゲームへ写す。drift-check と qa/a11y.mjs が同じ中身か見る） -->
+<style id="a11y-css">
+/* だれでも：キーボードで選んだ所に太い枠（WCAG 2.4.7・2.4.13） */
+:is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid #1a5fd0!important;outline-offset:2px!important;box-shadow:0 0 0 5px #fff!important}
+/* 読みやすい文字：UD フォント・行間 1.7・字間を少し広げる・斜体にしない（BDA Dyslexia Style Guide） */
+html.a11y-read body{line-height:1.7}
+html.a11y-read body,html.a11y-read body :where(*:not(svg):not(svg *):not([data-a11y-keepfont]):not([data-a11y-keepfont] *)){font-family:"BIZ UDPGothic","BIZ UDGothic","UD デジタル 教科書体 NK-R","UD Digi Kyokasho NK-R","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif!important;font-style:normal!important}
+html.a11y-read :is(p,li,dd,dt,blockquote,[data-a11y-say]){line-height:1.8!important;letter-spacing:.04em!important}
+html.a11y-read em,html.a11y-read i:not([aria-hidden]){font-style:normal!important;font-weight:700}
+/* 動きを減らす：揺れ・点滅・すべる動きを止める（WCAG 2.3.3。端末の「視差効果を減らす」でも自動で入る） */
+html.a11y-calm *,html.a11y-calm *::before,html.a11y-calm *::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+/* 色の見分けを助ける：ゲームごとの形・模様は各ゲームが html.a11y-cvd の下に書く。ここではリンクに下線 */
+html.a11y-cvd a{text-decoration:underline!important}
+/* ふりがな：ゲームが <ruby class="a11y-rb"> を置いた所だけ。選んだときだけ出す */
+html:not(.a11y-ruby) ruby.a11y-rb>rt{display:none}
+/* 設定の画面（どのゲームでも同じ見た目・同じ濃さ。白地に黒で 15:1） */
+.a11y-dlg{max-width:min(420px,calc(100vw - 32px));width:100%;box-sizing:border-box;border:2px solid #1d2320;border-radius:14px;padding:18px 16px 14px;background:#fffdf8;color:#1d2320;font:500 16px/1.6 "BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;letter-spacing:0}
+.a11y-dlg::backdrop{background:#0008}
+.a11y-dlg h2{font-size:19px;margin:0 0 4px;font-weight:700;line-height:1.4}
+.a11y-dlg p{margin:4px 0 10px;font-size:14px;color:#3d4440;line-height:1.6}
+.a11y-dlg label{display:flex;gap:12px;align-items:center;min-height:48px;padding:6px 4px;border-top:1px solid #1d232022;cursor:pointer;line-height:1.4}
+.a11y-dlg label small{display:block;font-size:13px;color:#3d4440}
+.a11y-dlg input[type=checkbox]{width:26px;height:26px;flex:none;accent-color:#1a5fd0;margin:0}
+.a11y-dlg .a11y-row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.a11y-dlg button,.a11y-btn,.a11y-saybtn{min-height:44px;min-width:44px;border-radius:10px;border:2px solid #1d2320;background:#fff;color:#1d2320;font:700 15px/1.2 "BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;padding:0 14px;cursor:pointer;letter-spacing:0}
+.a11y-dlg button.a11y-ok{background:#1d2320;color:#fff}
+.a11y-btn.a11y-float{position:fixed;left:max(8px,env(safe-area-inset-left,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:2147483000}
+/* 読み上げボタンが、いちばん下のボタン・リンクにかぶらないよう下をあける */
+html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!important}
+.a11y-saybtn{position:fixed;right:max(8px,env(safe-area-inset-right,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:2147483000;box-shadow:0 2px 8px #0003}
+.a11y-saybtn[hidden],.a11y-dlg [hidden]{display:none!important}
+.a11y-note{font-size:13px!important}
+</style>
+<script id="a11y-script">
+/* 見やすさの設定（色覚・ディスレクシア・弱視・動きに弱い人のため）。外へは何も送らない。
+   設定は localStorage の a11y-v1 に置く。同じサイト（satou-aaaaa.github.io）のゲームは同じ設定を使う。
+   ゲームの側でできること：
+   - 設定を開くボタンに data-a11y-open を付ける（無ければ左下に「Aa」のボタンを出す）
+   - 読み上げる文に data-a11y-say を付ける（問題文・知らせなど）
+   - 色の見分けを助ける形・模様は html.a11y-cvd の下に CSS で書く。JS では A11y.on('cvd')
+   - 揺れ・すべる動きを JS で動かすときは、A11y.on('calm') なら止める
+   - 設定が変わると document に a11ychange が届く
+   - 設定の印は html の class「a11y-<設定の名前>」（a11y-read など）。部品の class はこれと重ならない名前にする（2026-11-05 a11y-say がボタンとぶつかった） */
+(() => {
+  const KEY = "a11y-v1";
+  const root = document.documentElement;
+  const OPTS = [
+    ["read", "読みやすい文字", "UD フォント・行間と字間を広く"],
+    ["cvd", "色の見分けを助ける", "色に形・模様・記号を足す"],
+    ["calm", "動きを減らす", "揺れ・点滅・すべる動きを止める"],
+    ["say", "読み上げのボタンを出す", "問題や知らせを声で読む（端末の中の声だけ）"],
+    ["ruby", "ふりがなを出す", "むずかしい漢字に読みを付ける"],
+  ];
+  const media = (q) => { try { return matchMedia(q).matches; } catch { return false; } };
+  let S = {};
+  try { S = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { S = {}; }
+  // 決めていないものは端末の設定に合わせる（視差効果を減らす → 動きを減らす）
+  const on = (k) => (k in S ? !!S[k] : k === "calm" ? media("(prefers-reduced-motion: reduce)") : false);
+  let fontLoaded = false;
+  const loadFont = () => {
+    if (fontLoaded) return; fontLoaded = true;
+    // Google Fonts を許しているページだけ取りに行く（許していなければ端末にある UD フォントを使う）
+    const csp = (document.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content || "";
+    if (csp && !/fonts\.googleapis\.com/.test(csp)) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap";
+    document.head.appendChild(l);
+  };
+  const apply = () => {
+    for (const [k] of OPTS) root.classList.toggle("a11y-" + k, on(k));
+    if (on("read")) loadFont();
+    if (sayBtn) sayBtn.hidden = !on("say");
+    if (!on("say")) stop();
+  };
+  const set = (k, v) => {
+    S[k] = !!v;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* 保存できなくても今の画面には効かせる */ }
+    apply();
+    document.dispatchEvent(new CustomEvent("a11ychange", { detail: { key: k, on: !!v } }));
+  };
+
+  // 読み上げ：端末の中の日本語の声だけを使う（外へ文字を送る声は使わない）
+  const voice = () => { try { return speechSynthesis.getVoices().find((v) => /^ja/i.test(v.lang) && v.localService) || null; } catch { return null; } };
+  const stop = () => { try { speechSynthesis.cancel(); } catch { /* 無い端末 */ } };
+  const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !el.closest("[hidden],[aria-hidden=true],[inert]"); };
+  const sayText = () => [...document.querySelectorAll("[data-a11y-say]")].filter(visible).map((el) => (el.getAttribute("aria-label") || el.innerText || "").trim()).filter(Boolean).join("。");
+  const say = (text) => {
+    const v = voice();
+    if (!v || !text) return false;
+    stop();
+    const u = new SpeechSynthesisUtterance(text.slice(0, 600));
+    u.voice = v; u.lang = v.lang; u.rate = 0.95;
+    speechSynthesis.speak(u);
+    return true;
+  };
+
+  let dlg = null, sayBtn = null, lastFocus = null;
+  const build = () => {
+    dlg = document.createElement("dialog");
+    dlg.className = "a11y-dlg";
+    dlg.setAttribute("aria-labelledby", "a11y-h");
+    const hasRuby = !!document.querySelector("ruby.a11y-rb");
+    dlg.innerHTML = `<h2 id="a11y-h">見やすさ・読みやすさ</h2><p>ほかのゲームにも同じ設定が使われます。文字は2本の指で広げると大きくなります。</p>` +
+      OPTS.filter(([k]) => k !== "ruby" || hasRuby).map(([k, n, d]) => `<label><input type="checkbox" data-k="${k}"><span>${n}<small>${d}</small></span></label>`).join("") +
+      `<p class="a11y-note" id="a11y-novoice" hidden>この端末には、外へ送らずに読める日本語の声がありません。</p><div class="a11y-row"><button type="button" class="a11y-ok" data-a11y-close>閉じる</button></div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener("change", (e) => {
+      const k = e.target.dataset && e.target.dataset.k;
+      if (!k) return;
+      set(k, e.target.checked);
+      if (k === "say") dlg.querySelector("#a11y-novoice").hidden = !(e.target.checked && !voice());
+    });
+    dlg.querySelector("[data-a11y-close]").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("close", () => { if (lastFocus && lastFocus.focus) lastFocus.focus(); });
+    sayBtn = document.createElement("button");
+    sayBtn.type = "button"; sayBtn.className = "a11y-saybtn"; sayBtn.textContent = "🔊 読む"; sayBtn.setAttribute("aria-label", "画面の問題を読み上げる");
+    sayBtn.addEventListener("click", () => {
+      try { if (speechSynthesis.speaking) return stop(); } catch { /* 無い端末 */ }
+      if (!say(sayText())) open();
+    });
+    document.body.appendChild(sayBtn);
+    if (!document.querySelector("[data-a11y-open]")) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "a11y-btn a11y-float"; b.textContent = "Aa"; b.setAttribute("data-a11y-open", ""); b.setAttribute("aria-label", "見やすさの設定");
+      document.body.appendChild(b);
+    }
+    document.addEventListener("click", (e) => { const t = e.target.closest && e.target.closest("[data-a11y-open]"); if (t) { e.preventDefault(); open(); } });
+    apply();
+  };
+  const open = () => {
+    if (!dlg) build();
+    lastFocus = document.activeElement;
+    for (const c of dlg.querySelectorAll("input[data-k]")) c.checked = on(c.dataset.k);
+    dlg.querySelector("#a11y-novoice").hidden = !(on("say") && !voice());
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  };
+  apply();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+  window.A11y = { on, set, open, say, stop };
+})();
+</script>
+<!-- a11y:end -->
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<dialog id="howto" aria-labelledby="howto-t">
+  <h2 id="howto-t">遊び方</h2>
+  <ol>
+    <li>地図の上で、家から目的地までの道順が赤い線で動きます。何度でも見られます。</li>
+    <li>覚えたら「覚えた」を押します。線が消えます。</li>
+    <li>次に進む角を押して、同じ道をたどります。曲がる角では止まって、そこを押します。</li>
+    <li>1日の最後に、1本目の道で曲がった角の目印を思い出します。</li>
+  </ol>
+  <p>時間制限はありません。ゆっくり考えてください。今日の道はだれでも同じで1日1回。練習ととことんは何回でも遊べます。</p>
+  <p>文字の大きさは、はじめの画面の「文字」で変えられます。</p>
+  <p><a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
+  <button class="main" id="howto-ok" style="width:100%">わかった</button>
+</dialog>
+<script src="gen.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id), app = $("app");
+const SITE = "https://satou-aaaaa.github.io/machi-michijun/";
+const FEEDBACK = "https://github.com/satou-aaaaa/machi-michijun/issues/new?template=feedback.yml";
+const KEY = "michijun-v1", FSKEY = "michijun-fs", EPOCH = "2026-11-05";
+const { BY, IDS } = MM;
+const KM = 0.1; // 交差点1つ分の道のり（km）
+
+// ---- 文字の大きさ（この端末だけ。記録とは別に置く）----
+function fsGet() { try { const v = +localStorage.getItem(FSKEY); return v >= 1 && v <= 3 ? v : 2; } catch (e) { return 2; } }
+function fsSet(v) { try { localStorage.setItem(FSKEY, String(v)); } catch (e) {} document.documentElement.classList.remove("fs1", "fs2", "fs3"); document.documentElement.classList.add("fs" + v); }
+document.documentElement.classList.remove("fs1", "fs2", "fs3"); document.documentElement.classList.add("fs" + fsGet());
+
+// ---- 日付（日本時間。だれでも同じ道）----
+const jstNow = () => new Date(Date.now() + 9 * 3600e3);
+const todayKey = () => jstNow().toISOString().slice(0, 10);
+const dayNo = (k) => Math.round((Date.parse(k) - Date.parse(EPOCH)) / 864e5) + 1;
+const prevDay = (k) => new Date(Date.parse(k) - 864e5).toISOString().slice(0, 10);
+const md = (k) => `${+k.slice(5, 7)}/${+k.slice(8, 10)}`;
+const listOf = (mode, date) => (mode === "h" ? MM.hardList(date) : MM.dailyList(date));
+// ★はまちがい・ヒントの合計（0で★3・2まで★2・それより多いと★1）
+const starsOf = (n) => (n === 0 ? 3 : n <= 2 ? 2 : 1);
+const starStr = (s) => `<span class="stars" aria-label="星${s}つ">${"★".repeat(s)}<span class="off">${"★".repeat(3 - s)}</span></span>`;
+const kmStr = (steps) => `${(Math.round(steps * KM * 10) / 10).toFixed(1)}km`;
+
+// ---- 記録（この端末の localStorage だけ）----
+// days・hdays・adays：日付 → { m:[道ごとのまちがい], h:[ヒント], r:[思い出せた数, 目印の数, ちがう目印] }
+// dex：目印 → 曲がり角・目的地で通った回数。runs：遊んでいる途中（モードごと。練習で今日・上級の途中を消さない）
+const fresh = () => ({ v: 1, days: {}, hdays: {}, adays: {}, dex: {}, runs: {}, tut: false, kofi: {}, ebest: 0, walks: 0, steps: 0 });
+let MODE = "d";
+let mem = null; // 保存できない環境では、開いているあいだだけここに置く
+const doneOf = (r) => !!r && (r.mode === "e" ? !!r.over : r.res.length >= r.list.length);
+const recOf = (r) => { const b = r.res.filter((x) => x.k === "walk"), rc = r.res.find((x) => x.k === "recall"); return { m: b.map((x) => x.m), h: b.map((x) => x.h), r: rc ? [rc.ok, rc.of, rc.ng] : [0, 0, 0] }; };
+const runKey = (mode, date) => (mode === "a" ? "a:" + date : mode);
+const bookOf = (s, m) => (m === "d" ? s.days : m === "h" ? s.hdays : m === "a" ? (s.adays = s.adays || {}) : null);
+// 終わった今日・上級・あとからの回を日ごとの記録に入れる（同じ日の今日とあとからは、どちらか一方だけ）
+function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || b[r.date] || (r.mode === "a" && s.days[r.date]) || (r.mode === "d" && s.adays[r.date])) return false; b[r.date] = recOf(r); return true; }
+// 2つの記録を合わせる（保存に失敗したあとのメモリと保存。両方を fresh() で補ってから。日ごとの記録・帳は合わせ、数は多いほう。途中経過は同じ回なら進んだほう）
+const prog = (r) => (r.res ? r.res.length : 0) * 1000 + (r.cur ? ({ watch: 0, walk: 1, recall: 1 }[r.cur.stage] || 0) * 500 + (r.cur.pos || 0) * 10 + (r.cur.sel ? r.cur.sel.length : 0) + (r.cur.miss || 0) + (r.cur.hints || 0) : 0);
+function merge(a, b) {
+  a = Object.assign(fresh(), a); b = Object.assign(fresh(), b);
+  const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a], s = Object.assign(fresh(), n);
+  for (const k in o) {
+    if (k === "runs" || k === "t") continue;
+    const x = o[k], y = n[k];
+    if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); }
+    else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y);
+    else if (x === true) s[k] = true;
+    else if (y === undefined) s[k] = x;
+  }
+  const ra = a.runs || {}, rb = b.runs || {}; s.runs = Object.assign({}, n.runs);
+  for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) {
+    const x = ra[m], y = rb[m];
+    if (!x || !y) { const r = x || y; if (!r) continue; if (bank(s, r) || doneOf(r)) { delete s.runs[m]; continue; } const bd = bookOf(s, r.mode); if (!bd || !bd[r.date]) s.runs[m] = r; continue; }
+    if (x.id !== y.id) { const [w, l] = (x.date || "") >= (y.date || "") ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; }
+    else { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; }
+  }
+  return s;
+}
+function load() {
+  let a = null, b = null;
+  try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {}
+  if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null;
+  if (!a || !b) return Object.assign(fresh(), a || b || {});
+  return merge(a, b);
+}
+// 保存の前に読み直す（別のタブで進めた記録を消さない）
+function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
+function streak(days) { let k = todayKey(), n = 0; if (!days[k]) k = prevDay(k); while (days[k]) { n++; k = prevDay(k); } return n; }
+const playedDays = (s) => new Set([...Object.keys(s.days), ...Object.keys(s.adays || {})]).size;
+// 取りこぼした日：今日より前の7日のうち、今日の道もあとからも遊んでいない日（始めた日より前は無い）
+const LATE = 7;
+function lateDays(s, k = todayKey()) { const out = []; let d = k; for (let i = 0; i < LATE; i++) { d = prevDay(d); if (d < EPOCH) break; if (!s.days[d] && !(s.adays || {})[d]) out.push(d); } return out; }
+const sumOf = (rec) => rec.m.reduce((a, b) => a + b, 0) + rec.h.reduce((a, b) => a + b, 0);
+const fullRecall = (rec) => rec.r[1] > 0 && rec.r[0] === rec.r[1] && !rec.r[2];
+
+// ---- 実績：いまの記録から毎回数える（新しく残すものは無い）。[id, 名前, 条件, 種類, 数え方, 目標] ----
+function tally(s) {
+  const dd = Object.values(s.days || {}), all = [...dd, ...Object.values(s.adays || {}), ...Object.values(s.hdays || {})].filter((r) => r && Array.isArray(r.m));
+  return { days: playedDays(s), clean: dd.filter((r) => r && Array.isArray(r.m) && sumOf(r) === 0).length, hard: Object.keys(s.hdays || {}).length, late: Object.keys(s.adays || {}).length,
+    recall: all.filter(fullRecall).length, dex: Object.keys(s.dex || {}).filter((k) => BY[k]).length, ebest: s.ebest || 0, km: Math.floor((s.steps || 0) * KM) };
+}
+const ACH = [
+  ["clean1", "迷わない日", "今日の道を、まちがい・ヒントなしで歩く", 0, "clean", 1],
+  ["clean5", "道案内の名人", "迷わない日が5日", 0, "clean", 5],
+  ["recall3", "思い出し上手", "最後の思い出しで全部当てる（3回）", 0, "recall", 3],
+  ["hard1", "遠回りの道", "上級の道を歩き終える", 0, "hard", 1],
+  ["e6", "曲がり角6つ", "とことんで、6回曲がる道を一度で歩く", 0, "ebest", 6],
+  ["dex21", "町の半分", `目印帳に${Math.ceil(IDS.length / 2)}か所`, 1, "dex", Math.ceil(IDS.length / 2)],
+  ["dexAll", "町のすみずみ", `目印帳に${IDS.length}か所全部`, 1, "dex", IDS.length],
+  ["km10", "10km 歩く", "歩いた道のりが合わせて10km", 1, "km", 10],
+  ["km42", "マラソンの道のり", "歩いた道のりが合わせて42km", 1, "km", 42],
+  ["first", "はじめの一歩", "今日の道を1日歩く", 2, "days", 1],
+  ["d7", "7日歩く", "遊んだ日が合わせて7日", 2, "days", 7],
+  ["d30", "町のなじみ", "遊んだ日が合わせて30日", 2, "days", 30],
+  ["late1", "あとから散歩", "取りこぼした日をあとから歩く", 2, "late", 1],
+];
+const AGRP = ["腕前", "集める", "続ける"];
+const AUNIT = { clean: "日", recall: "回", hard: "日", ebest: "回", dex: "か所", km: "km", days: "日", late: "日" };
+const achGot = (s) => { const t = tally(s); return ACH.filter((a) => t[a[4]] >= a[5]).map((a) => a[0]); };
+// あと少しの実績：まだの実績のうち、いちばん目標に近いもの1つ（ゴールに近いほど人はがんばる。Kivetz ほか 2006）
+function nextAch(s) { const t = tally(s); let best = null; for (const a of ACH) { const n = t[a[4]]; if (n <= 0 || n >= a[5]) continue; const r = n / a[5], left = a[5] - n; if (!best || r > best.r || (r === best.r && left < best.left)) best = { id: a[0], name: a[1], left, unit: AUNIT[a[4]] || "", r }; } return best; }
+
+// ---- 画面の部品 ----
+let toastT = 0, VIEW = 0; // VIEW：画面を描き直すたびに増やす（少し遅れて動く処理は、画面が替わっていたら何もしない）
+function toast(t) { document.querySelectorAll(".toast").forEach((x) => x.remove()); const d = document.createElement("div"); d.className = "toast"; d.setAttribute("role", "status"); d.textContent = t; document.body.appendChild(d); clearTimeout(toastT); toastT = setTimeout(() => d.remove(), 2200); }
+const buzz = (n = 12) => { try { navigator.vibrate && !document.documentElement.classList.contains("a11y-calm") && navigator.vibrate(n); } catch (e) {} };
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const draw = (h) => { VIEW++; app.innerHTML = h; };
+const calm = () => document.documentElement.classList.contains("a11y-calm") || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" id="f-about">このゲームについて</a><a href="#" data-a11y-open>見やすさ</a><a href="#" data-hk>引き継ぎ</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a><a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi で応援</a></footer>`;
+function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.preventDefault(); openHow(); }; const a = $("f-about"); if (a) a.onclick = (e) => { e.preventDefault(); about(); }; }
+function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
+$("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
+const markBtn = (id, cls = "") => { const it = BY[id]; return `<button class="item ${cls}" data-id="${id}" aria-label="${it.n}"><span class="e" aria-hidden="true">${it.e}</span><span class="n">${it.n}</span></button>`; };
+const toTop = () => window.scrollTo(0, 0);
+
+function home() {
+  const s = load(), k = todayKey(), done = s.days[k], hdone = s.hdays[k];
+  // 最後まで遊んで結果を見る前に閉じた回は、開き直したら結果へ進める（記録をつける）
+  for (const m of Object.keys(s.runs)) { const r = s.runs[m]; if (m !== "p" && r && doneOf(r)) { MODE = m; return finish(); } }
+  const late = lateDays(s, k), ag = achGot(s).length, n = Object.keys(s.dex).filter((x) => BY[x]).length, fs = fsGet();
+  const rd = s.runs.d && s.runs.d.date === k ? s.runs.d : null, rh = s.runs.h && s.runs.h.date === k ? s.runs.h : null, re = s.runs.e && !doneOf(s.runs.e) ? s.runs.e : null;
+  const back = !done && !rd && playedDays(s) > 0 && !s.days[prevDay(k)] && !(s.adays || {})[prevDay(k)]; // しばらくぶりの人を迎える（休んだ日を責めない）
+  draw(`
+    <div class="fsrow" role="group" aria-label="文字の大きさ">文字<button data-fs="1" aria-pressed="${fs === 1}" aria-label="文字 ふつう">あ</button><button data-fs="2" aria-pressed="${fs === 2}" aria-label="文字 大きい" style="font-size:1.15em">あ</button><button data-fs="3" aria-pressed="${fs === 3}" aria-label="文字 とても大きい" style="font-size:1.3em">あ</button></div>
+    <h1 class="title">町の道順</h1>
+    <div class="hero" aria-hidden="true"><span>🏠</span><i>→</i><span>🍞</span><i>→</i><span>📮</span><i>→</i><span>🏁</span></div>
+    <p class="lead" data-a11y-say>地図で見た道を覚えて、同じ道をたどる。<br>だれでも同じ、1日3本の道。</p>
+    ${back ? `<p class="note" id="welcome">おかえりなさい。きょうも、ゆっくりどうぞ。</p>` : ""}
+    ${done ? `<div class="share">今日の結果　${shareMarks(done)}</div>` : ""}
+    <button class="main" id="go-d">${done ? "今日の結果を見る" : rd ? `続きから（${Math.min(rd.res.length + 1, 4)}つ目）` : `今日の道を歩く <small>第${dayNo(k)}日</small>`}</button>
+    ${done ? `<button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：曲がり角5つと6つの道"}</button>` : ""}
+    <button class="main alt" id="go-e">${re ? `とことんの続きから（曲がり角${re.len}つ）` : "とことん：何回曲がる道まで覚えられる？"}${s.ebest ? ` <small>自己ベスト ${s.ebest}回</small>` : ""}</button>
+    <div class="row"><button class="sub" id="go-p">練習（何回でも）</button><button class="sub" id="go-dex">目印帳 ${n}/${IDS.length}</button></div>
+    <div class="row"><button class="sub" id="go-cal" aria-label="カレンダー${late.length ? `（あとから遊べる日 ${late.length}）` : ""}">カレンダー${late.length ? ` <small class="badge">▶${late.length}</small>` : ""}</button><button class="sub" id="go-ach">実績 ${ag}/${ACH.length}</button></div>
+    <div class="stats"><div><b>${playedDays(s)}</b><small>遊んだ日</small></div><div><b>${kmStr(s.steps || 0)}</b><small>歩いた道のり</small></div><div><b>${s.ebest || 0}回</b><small>覚えた最高</small></div></div>
+    ${footer()}`);
+  document.querySelectorAll("[data-fs]").forEach((b) => (b.onclick = () => { fsSet(+b.dataset.fs); home(); }));
+  $("go-d").onclick = () => (k !== todayKey() ? home() : done ? result("d", k) : startRun("d"));
+  if ($("go-h")) $("go-h").onclick = () => (hdone ? result("h", k) : k === todayKey() ? startRun("h") : home());
+  $("go-e").onclick = () => startRun("e");
+  $("go-p").onclick = practiceMenu;
+  $("go-dex").onclick = dexView;
+  $("go-cal").onclick = () => cal();
+  $("go-ach").onclick = achView;
+  bindFooter(); toTop();
+  if (!s.tut) openHow();
+}
+function practiceMenu() {
+  draw(`<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（目印帳には載ります）</small></h1></header>
+    <p class="note">曲がる回数を選んでください。</p>
+    <div class="lens">${[2, 3, 4, 5, 6, 7].map((n) => `<button class="sub" data-n="${n}" style="min-height:72px;font-size:1.05rem">${n}回曲がる</button>`).join("")}</div>
+    <p class="note">練習は何回でも遊べます。</p>${footer()}`);
+  $("back").onclick = home;
+  document.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => startRun("p", +b.dataset.n)));
+  bindFooter(); toTop();
+}
+const newId = () => Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+function startRun(mode, opt) {
+  const k = todayKey(); let ng = false;
+  save((s) => {
+    if (mode === "a") {
+      const ra = s.runs[runKey("a", opt)];
+      if (ra && ra.date === opt && !doneOf(ra)) return; // 続きから
+      if (!lateDays(s, k).includes(opt)) { ng = true; return; }
+      s.runs[runKey("a", opt)] = { mode, date: opt, list: MM.dailyList(opt), res: [], cur: null, id: "a" + opt, a0: achGot(s) };
+      return;
+    }
+    // とことん：曲がり角2つから始め、一度で歩けたら1つふやす。迷った道が3本で終わり（途中なら続きから。日をまたいでも続けられる）
+    if (mode === "e") { const re = s.runs.e; if (re && !doneOf(re)) return; s.runs.e = { mode, date: k, len: 2, life: 3, list: [MM.freeWalk(2)], res: [], cur: null, id: newId(), a0: achGot(s) }; return; }
+    if (mode !== "p" && s.runs[mode] && s.runs[mode].date === k) return; // 続きから
+    if ((mode === "d" && s.days[k]) || (mode === "h" && s.hdays[k])) return; // 別のタブで今日の分を終えていたら、もう一度は始めない
+    const list = mode === "p" ? [MM.freeWalk(opt)] : listOf(mode, k);
+    s.runs[mode] = { mode, date: k, list, res: [], cur: null, id: newId(), a0: achGot(s) };
+  });
+  if (ng) return cal();
+  MODE = runKey(mode, opt);
+  play();
+}
+
+// ---- 遊ぶ画面 ----
+// cur：{ id, i, stage: "watch"|"walk"|"recall", pos:道のどこまで来たか, miss, hints, wrong:続けてまちがえた数, sel:[思い出しで選んだ目印] }
+let cur = null;
+const same = (r) => r && cur && r.id === cur.id && r.res.length === cur.i; // 保存した進み具合が、この画面と同じ回か
+// 途中の様子を保存する（ヒント・まちがいの数は、別のタブで数えた分より減らさない）
+function keep() { save((s) => { const r = s.runs[MODE]; if (!same(r)) return; const w = r.cur && r.cur.i === cur.i ? r.cur : null; if (w) { for (const q of ["miss", "hints"]) cur[q] = Math.max(cur[q] || 0, w[q] || 0); if (w.stage === cur.stage && (w.pos || 0) > cur.pos) cur.pos = w.pos; } r.cur = { i: cur.i, stage: cur.stage, pos: cur.pos, miss: cur.miss, hints: cur.hints, wrong: cur.wrong, sel: cur.sel.slice() }; }); }
+function play() {
+  const s = load(), run = s.runs[MODE];
+  if (!run) return home();
+  if (doneOf(run)) return finish();
+  if (run.mode === "a" && s.days[run.date]) { save((s2) => { delete s2.runs[MODE]; }); toast("この日は別の画面で遊び終えています"); return home(); }
+  const i = run.res.length, trip = run.list[i];
+  const sv = run.cur && run.cur.i === i ? run.cur : null;
+  cur = { id: run.id, i, stage: sv ? sv.stage : trip.k === "recall" ? "recall" : "watch", pos: sv ? Math.min(sv.pos || 0, trip.path ? trip.path.length - 1 : 0) : 0, miss: sv ? sv.miss || 0 : 0, hints: sv ? sv.hints || 0 : 0, wrong: sv ? sv.wrong || 0 : 0, sel: sv ? (sv.sel || []).filter((x) => trip.shelf && trip.shelf.includes(x)) : [] };
+  if (cur.stage === "done") return endTrip(trip); // 歩き終えて次へ進む前に閉じた回
+  if (cur.stage === "watch") watchView(run, trip);
+  else if (cur.stage === "walk") walkView(run, trip);
+  else recallView(run, trip);
+}
+function headOf(run, sub) {
+  const t = run.mode === "d" ? `今日の道 第${dayNo(run.date)}日` : run.mode === "a" ? `${md(run.date)} の道（あとから）` : run.mode === "h" ? "上級の道" : run.mode === "e" ? `とことん（${run.res.length + 1}本目）` : "練習";
+  const prog = run.mode === "e" ? `<span class="life" id="life" aria-label="のこり ${run.life}">${"👟".repeat(Math.max(0, run.life))}<span class="off">${"👟".repeat(Math.max(0, 3 - run.life))}</span></span>` : "";
+  return `<header><button class="icon" id="back" aria-label="ホームへ（途中は残ります）">←</button><h1>${t}<small>${sub}</small></h1>${prog}</header>`;
+}
+function stepBar() { const st = ["watch", "walk"], nm = { watch: "覚える", walk: "たどる" }, at = st.indexOf(cur.stage); return `<div class="step">${st.map((x, j) => `<span class="${j < at ? "done" : j === at ? "on" : ""}">${j + 1} ${nm[x]}</span>`).join("")}</div>`; }
+function tripLabel(run, trip) { const n = run.list.filter((t) => t.k === "walk").length; return (run.mode === "e" || run.mode === "p" ? "" : `${run.res.length + 1}本目／${n}本　`) + (trip.turns ? `曲がる角 ${trip.turns.length}つ` : ""); }
+
+// 地図：交差点は列×行。区画（目印）は交差点のあいだ。道順の線と、たどった線は svg
+const P = (x, n) => ((x + 0.5) / n) * 100;
+function mapHtml(trip, opt = {}) {
+  const { cols, rows } = trip, rings = opt.rings || [], goalB = Object.keys(trip.blocks).find((b) => trip.blocks[b] === trip.goal);
+  let h = `<div class="map" id="map" style="aspect-ratio:${cols}/${rows}" role="group" aria-label="町の地図">`;
+  h += `<svg viewBox="0 0 ${cols * 10} ${rows * 10}" preserveAspectRatio="none" aria-hidden="true"><polyline class="rt" id="rt" points=""/><polyline class="wk" id="wk" points=""/></svg>`;
+  for (let by = 0; by < rows - 1; by++) for (let bx = 0; bx < cols - 1; bx++) {
+    const b = bx + "," + by, id = trip.blocks[b], isHome = b === trip.home;
+    const pos = `left:calc(${P(bx, cols)}% + 7px);top:calc(${P(by, rows)}% + 7px);width:calc(${100 / cols}% - 14px);height:calc(${100 / rows}% - 14px)`;
+    if (isHome) h += `<div class="blk home" style="${pos}" role="img" aria-label="家">🏠</div>`;
+    else if (id) h += `<div class="blk${id === trip.goal ? " goal" : ""}${rings.includes(id) ? " ring" : ""}" data-m="${id}" style="${pos}" role="img" aria-label="${BY[id].n}${id === trip.goal ? "（目的地）" : ""}">${BY[id].e}${id === trip.goal && opt.flag ? `<span class="flag" aria-hidden="true">🏁</span>` : ""}</div>`;
+  }
+  if (opt.nodes) for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) h += `<button class="nd" data-x="${x}" data-y="${y}" style="left:${P(x, cols)}%;top:${P(y, rows)}%" aria-label="${y + 1}行目 ${x + 1}列目の角"></button>`;
+  h += `<span class="who" id="who" aria-hidden="true">🚶</span></div>`;
+  return h;
+}
+function sizeMap() { const m = $("map"); if (m) m.style.setProperty("--cell", (m.clientWidth / (m.style.aspectRatio ? +m.style.aspectRatio.split("/")[0] : 5)) + "px"); }
+window.addEventListener("resize", sizeMap);
+const pts = (trip, upto) => trip.path.slice(0, upto + 1).map(([x, y]) => `${(x + 0.5) * 10},${(y + 0.5) * 10}`).join(" ");
+function placeWho(trip, i) { const w = $("who"); if (!w) return; const [x, y] = trip.path[i]; w.style.left = P(x, trip.cols) + "%"; w.style.top = P(y, trip.rows) + "%"; }
+
+// 1. 道順を見る（何度でも。時間制限なし）
+function watchView(run, trip) {
+  const hard = run.mode === "h";
+  const tip = run.mode === "p" || run.mode === "e" ? MM.TIPS[(run.res.length + run.id.length) % MM.TIPS.length] : MM.TIP_OF(run.date, EPOCH), ex = tip.ex(trip);
+  draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
+    <p class="big" data-a11y-say>家から <b>${BY[trip.goal].e} ${BY[trip.goal].n}</b> へ</p>
+    ${mapHtml(trip, { rings: hard ? [] : trip.turns.map((t) => t.m), flag: true })}
+    ${hard ? `<p class="note">上級は、道のりのことばが出ません。地図だけで覚えます。</p>` : `<ol class="ways" id="ways" data-a11y-say>${MM.words(trip).map((w) => `<li><span class="e" aria-hidden="true">${w.e}</span><span>${esc(w.s).replace(/(右|左)$/, "<b>$1</b>")}</span></li>`).join("")}</ol>`}
+    <div class="row"><button class="sub" id="again">もう一度見る</button></div>
+    <div class="tip" id="tip">💡 覚え方のコツ：<b>${tip.t}</b><br>${tip.d}${ex ? `<span class="ex">${esc(ex)}</span>` : ""}</div>
+    <button class="main ok" id="ready">覚えた！歩きはじめる</button>
+    <p class="note">時間制限はありません。歩きはじめると、線とことばは消えます。</p>`);
+  sizeMap();
+  $("back").onclick = home;
+  $("again").onclick = () => animate(trip);
+  $("ready").onclick = () => { if (!same(load().runs[MODE])) return play(); cur.stage = "walk"; cur.pos = 0; keep(); walkView(load().runs[MODE], trip); };
+  animate(trip);
+  toTop();
+}
+// 道順の線を、家から1つずつのばす（動きを減らす設定では、はじめから全部を出す）
+function animate(trip) {
+  const v = VIEW, rt = $("rt"), n = trip.path.length - 1;
+  if (!rt) return;
+  if (calm()) { rt.setAttribute("points", pts(trip, n)); placeWho(trip, n); return; }
+  let i = 0; rt.setAttribute("points", pts(trip, 0)); placeWho(trip, 0);
+  const tick = () => { if (v !== VIEW || !$("rt")) return; i++; $("rt").setAttribute("points", pts(trip, i)); placeWho(trip, i); if (i < n) setTimeout(tick, 520); };
+  setTimeout(tick, 600);
+}
+
+// 2. たどる：次に進む角を押す。まっすぐ先の角なら、あいだの角を飛ばして押してよい（曲がる角では止まる）
+function walkView(run, trip) {
+  draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
+    <p class="big" data-a11y-say>家から <b>${BY[trip.goal].e} ${BY[trip.goal].n}</b> へ</p>
+    ${mapHtml(trip, { nodes: true, flag: true })}
+    <div class="msg" id="msg" aria-live="polite" data-a11y-say>次に進む角を押してください</div>
+    <div id="hintbox" aria-live="polite">${hintHtml(trip)}</div>
+    <div class="row"><button class="sub" id="hint"${cur.hints >= 2 ? " disabled" : ""}>ヒント${run.mode === "e" ? "（👟を1つ使う）" : ""}</button></div>
+    <p class="note">まちがえても、そこから続けられます。</p>`);
+  sizeMap();
+  $("back").onclick = home;
+  paintWalk(trip);
+  document.querySelectorAll("#map .nd").forEach((b) => (b.onclick = () => tapNode(+b.dataset.x, +b.dataset.y, trip, b)));
+  $("hint").onclick = () => walkHint(trip);
+  toTop();
+}
+function paintWalk(trip) {
+  $("wk").setAttribute("points", pts(trip, cur.pos)); placeWho(trip, cur.pos);
+  const passed = new Set(trip.path.slice(0, cur.pos).map((p) => p.join(","))), here = trip.path[cur.pos].join(",");
+  document.querySelectorAll("#map .nd").forEach((b) => { const k = b.dataset.x + "," + b.dataset.y; b.classList.toggle("past", passed.has(k)); b.classList.toggle("here", k === here); b.classList.remove("glow"); if (k === here) b.setAttribute("aria-label", b.getAttribute("aria-label").replace(/（いまここ）$/, "") + "（いまここ）"); else b.setAttribute("aria-label", b.getAttribute("aria-label").replace(/（いまここ）$/, "")); });
+  if (cur.hints >= 1 || cur.wrong >= 3) { const t = nextStop(trip), b = document.querySelector(`#map .nd[data-x="${trip.path[t][0]}"][data-y="${trip.path[t][1]}"]`); if (b) b.classList.add("glow"); }
+}
+// 次に止まる所（次の曲がる角か、目的地）
+const nextStop = (trip) => { const t = trip.turns.find((q) => q.i > cur.pos); return t ? t.i : trip.path.length - 1; };
+// ヒントは2段：1回目は、次に止まる角を光らせる。2回目は、そこで曲がる向き（目印のことば）も出す
+function hintHtml(trip) {
+  if (!cur.hints) return "";
+  const t = trip.turns.find((q) => q.i > cur.pos);
+  return `<div class="hint">光っている角まで進みます${cur.hints >= 2 ? (t ? `。そこは <b>${BY[t.m].e} ${BY[t.m].n}の角を${t.d}</b>` : `。そこが <b>${BY[trip.goal].n}</b> です`) : ""}</div>`;
+}
+function walkHint(trip) {
+  if (cur.hints >= 2 || !same(load().runs[MODE])) return;
+  cur.hints++; keep(); buzz();
+  $("hintbox").innerHTML = hintHtml(trip); $("hint").disabled = cur.hints >= 2; paintWalk(trip);
+}
+function tapNode(x, y, trip, b) {
+  if (cur.stage !== "walk") return;
+  const [cx, cy] = trip.path[cur.pos], m = $("msg");
+  if (x === cx && y === cy) return;
+  if (x !== cx && y !== cy) { m.className = "msg"; m.textContent = "まっすぐ進める角を押してください（曲がるのは角で1回ずつ）"; return; }
+  if (!same(load().runs[MODE])) { toast("別の画面で先に進んでいます"); return play(); }
+  const dx = Math.sign(x - cx), dy = Math.sign(y - cy), n = Math.abs(x - cx) + Math.abs(y - cy);
+  let ok = true, j = 0;
+  for (j = 1; j <= n; j++) { const p = trip.path[cur.pos + j]; if (!p || p[0] !== cx + dx * j || p[1] !== cy + dy * j) { ok = false; break; } }
+  if (ok) {
+    cur.pos += n; cur.wrong = 0; buzz();
+    if (cur.pos >= trip.path.length - 1) { cur.stage = "done"; keep(); paintWalk(trip); m.className = "msg ok"; m.textContent = `${BY[trip.goal].n}に着きました！`; document.querySelectorAll("#map .nd").forEach((q) => (q.disabled = true)); $("hint").disabled = true; const v = VIEW; setTimeout(() => { if (v === VIEW) endTrip(trip); }, 900); return; }
+    const t = trip.turns.find((q) => q.i === cur.pos);
+    m.className = "msg ok"; m.textContent = t ? `${BY[t.m].n}の角に着きました。次はどちらへ？` : "その道で合っています";
+    keep(); paintWalk(trip); $("hintbox").innerHTML = hintHtml(trip);
+  } else {
+    cur.miss++; cur.wrong++; buzz(40);
+    // 1つ目からちがう向きか、曲がる角を通りすぎたか
+    m.className = "msg ng"; m.textContent = j > 1 ? "行きすぎです。とちゅうに曲がる角があります" : "その道ではありません。もう一度考えてみましょう";
+    b.classList.remove("ng"); void b.offsetWidth; b.classList.add("ng");
+    keep(); if (cur.wrong >= 3) { paintWalk(trip); m.textContent += "（光っている角まで進みます）"; }
+  }
+}
+// 1本の道を終える：結果を入れ、目印帳に目印を足す
+function endTrip(trip) {
+  let r = null;
+  const s = save((s) => {
+    r = s.runs[MODE]; if (!same(r)) { r = null; return; }
+    r.res.push({ k: "walk", m: cur.miss, h: cur.hints }); r.cur = null;
+    for (const id of [...trip.turns.map((t) => t.m), trip.goal]) s.dex[id] = (s.dex[id] || 0) + 1;
+    s.walks = (s.walks || 0) + 1; s.steps = (s.steps || 0) + trip.path.length - 1;
+    if (r.mode === "e") {
+      const perfect = cur.miss === 0 && cur.hints === 0;
+      if (perfect) { s.ebest = Math.max(s.ebest || 0, trip.turns.length); r.len = Math.min(10, r.len + 1); } else r.life--;
+      if (r.life <= 0) r.over = true; else r.list.push(MM.freeWalk(r.len));
+    }
+  });
+  if (!r) { toast("別の画面で先に進んでいます"); return play(); }
+  const run = s.runs[MODE], st = starsOf(cur.miss + cur.hints), fin = doneOf(run);
+  const nextRecall = !fin && run.list[run.res.length] && run.list[run.res.length].k === "recall";
+  const say = cur.miss + cur.hints === 0 ? "迷わず着きました！" : "目的地に着きました";
+  draw(`${headOf(run, "")}
+    <div class="verdict" role="status"><p class="big">${say} ${starStr(st)}</p>
+      <ol class="ways">${MM.words(trip).map((w) => `<li><span class="e" aria-hidden="true">${w.e}</span><span>${esc(w.s)}</span></li>`).join("")}</ol>
+      <p class="note">まちがい ${cur.miss}・ヒント ${cur.hints}・歩いた道のり ${kmStr(trip.path.length - 1)}</p>
+      ${run.mode === "e" ? `<p class="note">${cur.miss + cur.hints === 0 ? `一度で歩けました。次は曲がり角${run.len}つの道です。` : `👟を1つ使いました。次も曲がり角${run.len}つです。`}</p>` : ""}
+      ${nextRecall ? `<p class="note">最後に、<b>1本目の道で曲がった角の目印</b>を思い出します。</p>` : ""}
+      <button class="main" id="next">${fin ? "結果を見る" : nextRecall ? "思い出しへ" : "次の道へ"}</button>
+      ${run.mode === "e" && !fin ? `<button class="sub" id="quit">ここでおしまいにする</button>` : ""}</div>`);
+  $("back").onclick = home;
+  $("next").onclick = play;
+  if ($("quit")) $("quit").onclick = () => { save((s2) => { const r2 = s2.runs.e; if (r2 && r2.id === run.id) r2.over = true; }); finish(); };
+  toTop();
+}
+// 3. 思い出し：1本目の道で曲がった角の目印を、全部選んで「これで決める」
+function recallView(run, trip) {
+  draw(`${headOf(run, "最後の思い出し")}
+    <p class="big" style="font-size:1.15rem" data-a11y-say>1本目の道で、曲がった角にあった目印は？</p>
+    <p class="note">${trip.items.length}か所あります。全部選んで「これで決める」を押してください。押し直すと外せます。</p>
+    <div class="shelf" id="shelf">${trip.shelf.map((id) => markBtn(id, cur.sel.includes(id) ? "sel" : "")).join("")}</div>
+    <div class="msg" id="msg" aria-live="polite"></div>
+    <button class="main ok" id="decide"${cur.sel.length ? "" : " disabled"}>これで決める（${cur.sel.length}/${trip.items.length}）</button>`);
+  $("back").onclick = home;
+  document.querySelectorAll("#shelf .item").forEach((b) => { b.setAttribute("aria-pressed", cur.sel.includes(b.dataset.id)); b.onclick = () => {
+    const id = b.dataset.id, j = cur.sel.indexOf(id);
+    if (j >= 0) cur.sel.splice(j, 1); else if (cur.sel.length < trip.items.length) cur.sel.push(id); else return toast(`選べるのは${trip.items.length}か所までです`);
+    b.classList.toggle("sel", cur.sel.includes(id)); b.setAttribute("aria-pressed", cur.sel.includes(id)); buzz(6);
+    $("decide").disabled = !cur.sel.length; $("decide").textContent = `これで決める（${cur.sel.length}/${trip.items.length}）`; keep();
+  }; });
+  $("decide").onclick = () => recallDone(trip);
+  toTop();
+}
+function recallDone(trip) {
+  if (!same(load().runs[MODE])) { toast("別の画面で先に進んでいます"); return play(); }
+  const ok = cur.sel.filter((x) => trip.items.includes(x)).length, ng = cur.sel.length - ok;
+  save((s) => { const r = s.runs[MODE]; if (!same(r)) return; r.res.push({ k: "recall", ok, of: trip.items.length, ng }); r.cur = null; });
+  document.querySelectorAll("#shelf .item").forEach((b) => { const id = b.dataset.id, on = cur.sel.includes(id), want = trip.items.includes(id); b.disabled = true; b.classList.remove("sel"); if (on && want) b.classList.add("got"); else if (on) b.classList.add("ng"); else if (want) b.classList.add("miss"); });
+  $("msg").textContent = ok === trip.items.length && !ng ? "全部思い出せました" : `${trip.items.length}か所のうち ${ok}か所 思い出せました`;
+  $("decide").outerHTML = `<div class="verdict" role="status"><p class="big">${ok === trip.items.length && !ng ? "全部思い出せました！" : `${trip.items.length}か所のうち ${ok}か所 思い出せました`}</p>
+    <p class="note">${ok < trip.items.length ? "点線の目印が、思い出せなかった目印です。" : "あとから思い出すのは、見た直後より難しいものです。"}</p>
+    <button class="main" id="next">結果を見る</button></div>`;
+  $("next").onclick = finish; buzz([10, 40, 10]);
+}
+
+// ---- 結果 ----
+function finish() {
+  const s = load(), run = s.runs[MODE];
+  if (!run) return home();
+  if (run.mode === "e") return endFinish(run);
+  let first = false, newAch = [];
+  const rec = recOf(run);
+  save((s2) => { first = bank(s2, run); const c = s2.runs[MODE]; if (c && c.id === run.id) delete s2.runs[MODE]; if (Array.isArray(run.a0)) newAch = achGot(s2).filter((id) => !run.a0.includes(id)); });
+  if (run.mode === "p") return result("p", run.date, false, { list: run.list, ...rec }, newAch);
+  result(run.mode, run.date, first, null, newAch);
+}
+function endFinish(run) {
+  const n = Math.max(0, ...run.res.map((x, j) => (x.m === 0 && x.h === 0 ? run.list[j].turns.length : 0))); let newAch = [];
+  save((s2) => { const c = s2.runs.e; if (c && c.id === run.id) delete s2.runs.e; if (Array.isArray(run.a0)) newAch = achGot(s2).filter((id) => !run.a0.includes(id)); });
+  const s = load();
+  draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>とことん<small>${run.res.length}本の道</small></h1></header>
+    <p class="big" id="eres">${n ? `曲がり角${n}つの道を一度で歩けました` : "散歩おつかれさまでした"}</p>
+    <p class="note" id="ebest">${n && n >= s.ebest ? "🎉 自己ベストです！" : `自己ベスト ${s.ebest}回`}</p>
+    ${newAch.length ? `<p class="achnew" id="achnew">${newAch.map((id) => `🏅 実績：${ACH.find((a) => a[0] === id)[1]}`).join("<br>")}</p>` : ""}
+    <div class="rlist">${run.res.map((x, j) => `<div><span class="x">${x.m + x.h === 0 ? "⭕" : "👟"}</span><span class="w"><b>曲がり角${run.list[j].turns.length}つの道</b><br>まちがい ${x.m}・ヒント ${x.h}</span></div>`).join("")}</div>
+    <button class="main" id="go-e">もう一度とことん</button>
+    <div class="row"><button class="sub" id="go-p">練習する</button><button class="sub" id="go-dex">目印帳</button></div>
+    <p class="note"><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a></p>`);
+  $("back").onclick = home; $("go-e").onclick = () => startRun("e"); $("go-p").onclick = practiceMenu; $("go-dex").onclick = dexView;
+  toTop();
+}
+// 共有の文：目印の名前・道（答え）は出さない。★の数と思い出しの数だけ
+const sq = (n) => (n === 0 ? "🟩" : n <= 2 ? "🟨" : "🟧");
+const shareMarks = (rec) => rec.m.map((m, j) => sq(m + rec.h[j])).join("") + ` 🧠${rec.r[0]}/${rec.r[1]}`;
+function shareText(mode, k, rec) { return `町の道順${mode === "h" ? " 上級" : ""} 第${dayNo(k)}日 ${md(k)}\n🗺️${shareMarks(rec)}${sumOf(rec) === 0 && fullRecall(rec) ? " 迷わず" : ""}`; }
+function untilNext() { const n = jstNow(), ms = 864e5 - (n.getTime() % 864e5); return `${Math.floor(ms / 36e5)}時間${Math.floor((ms % 36e5) / 6e4)}分`; }
+function result(mode, k, first, prec, newAch = []) {
+  const s = load(), list = mode === "p" ? prec.list : listOf(mode === "a" ? "d" : mode, k), rec = mode === "p" ? prec : bookOf(s, mode)[k];
+  if (!rec) return home();
+  const walks = list.filter((t) => t.k === "walk"), total = sumOf(rec), late = mode === "a", text = shareText(mode, k, rec);
+  const showKofi = first && (mode === "d" || mode === "h") && total === 0 && fullRecall(rec) && !s.kofi[k + mode]; // 全部迷わず・思い出しも満点の初回だけ。あとからには出さない
+  if (showKofi) save((s2) => { s2.kofi[k + mode] = 1; });
+  draw(`
+    <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>町の道順<small>${mode === "d" ? `今日の道 第${dayNo(k)}日` : late ? `${md(k)} あとから` : mode === "h" ? "上級の道" : "練習"}</small></h1></header>
+    <p class="big">${total === 0 && (mode === "p" || fullRecall(rec)) ? "迷わず歩けました！" : "今日の道、歩き終えました"}</p>
+    ${newAch.length ? `<p class="achnew" id="achnew">${newAch.map((id) => `🏅 実績：${ACH.find((a) => a[0] === id)[1]}`).join("<br>")}</p>` : ""}
+    ${(() => { const nx = nextAch(s); return nx && mode !== "p" ? `<p class="achnext" id="achnext">🎯 あと${nx.left}${nx.unit}で「${nx.name}」</p>` : ""; })()}
+    <div class="rlist">${walks.map((t, j) => `<div><span class="x">${BY[t.goal].e}</span><span class="w"><b>${BY[t.goal].n}へ（曲がり角${t.turns.length}つ）</b> ${starStr(starsOf(rec.m[j] + rec.h[j]))}<br>まちがい ${rec.m[j]}・ヒント ${rec.h[j]}</span></div>`).join("")}
+      ${rec.r[1] ? `<div><span class="x">🧠</span><span class="w"><b>思い出し ${rec.r[0]}/${rec.r[1]}か所</b>${rec.r[2] ? `（ちがう目印 ${rec.r[2]}）` : ""}</span></div>` : ""}</div>
+    ${late ? `<p class="note">あとから遊んだ日は、カレンダーに ↺ で残ります（連続の日には数えません）。</p><button class="main alt" id="go-cal">カレンダーへ</button>` : ""}
+    ${mode === "d" || mode === "h" ? `<div class="share">${esc(text)}</div>
+    <button class="main" id="share">結果をシェア</button>
+    <div class="shares"><a id="toX" target="_blank" rel="noopener">Xで投稿</a><a id="toLine" target="_blank" rel="noopener">LINEで送る</a><button id="copy">コピー</button></div>
+    <p class="note">🟩まちがいなし　🟨1〜2回　🟧3回以上　🧠思い出し<br>次の道まで あと <b>${untilNext()}</b></p>` : ""}
+    ${mode !== "p" ? `<button class="main alt" id="go-e">続けて遊ぶ：とことん${s.ebest ? `（ベスト ${s.ebest}回）` : ""}</button>` : ""}
+    ${mode === "d" && k === todayKey() && !s.hdays[k] ? `<button class="main alt" id="go-h">上級：曲がり角5つと6つの道</button>` : ""}
+    <div class="row"><button class="sub" id="go-p">練習する</button><button class="sub" id="go-dex">目印帳</button></div>
+    ${showKofi ? `<p class="note kofi">楽しめたら、<a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi でコーヒー1杯の応援</a>をもらえると、新しいゲームづくりの励みになります（任意・遊ぶのはずっと無料）。</p>` : ""}
+    <p class="note"><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a></p>`);
+  $("back").onclick = home; $("go-p").onclick = practiceMenu; $("go-dex").onclick = dexView;
+  if ($("go-e")) $("go-e").onclick = () => startRun("e");
+  if ($("go-h")) $("go-h").onclick = () => (k === todayKey() ? startRun("h") : home());
+  if ($("go-cal")) $("go-cal").onclick = () => cal(k.slice(0, 7));
+  if ($("share")) {
+    const withUrl = text + "\n" + SITE;
+    $("toX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(withUrl);
+    $("toLine").href = "https://line.me/R/share?text=" + encodeURIComponent(withUrl);
+    const copy = (t) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("コピーしました"), () => toast("コピーできませんでした")); };
+    $("copy").onclick = () => copy(withUrl);
+    $("share").onclick = () => { if (navigator.share) navigator.share({ text: withUrl }).catch(() => {}); else copy(withUrl); };
+  }
+  toTop();
+}
+
+// ---- 目印帳・実績・カレンダー・このゲームについて ----
+function dexView() {
+  const s = load(), n = IDS.filter((x) => s.dex[x]).length;
+  draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>目印帳<small>${n}/${IDS.length}か所</small></h1></header>
+    <p class="note">曲がった角と目的地の目印が集まります。数字は通った回数です。</p>
+    <div class="dex">${IDS.map((id) => s.dex[id] ? `<div><span class="e" aria-hidden="true">${BY[id].e}</span><small>${BY[id].n}</small><b>${s.dex[id]}回</b></div>` : `<div class="no" aria-label="まだ"><span class="e" aria-hidden="true">${BY[id].e}</span><small>？</small></div>`).join("")}</div>
+    ${footer()}`);
+  $("back").onclick = home; bindFooter(); toTop();
+}
+function achView() {
+  const s = load(), t = tally(s), got = achGot(s);
+  draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>実績<small>${got.length}/${ACH.length}</small></h1></header>
+    ${AGRP.map((g, gi) => `<p class="agrp">${g}</p><div class="alist">${ACH.filter((a) => a[3] === gi).map((a) => { const ok = got.includes(a[0]), n = Math.min(t[a[4]], a[5]); return `<div class="ach${ok ? " got" : ""}" data-id="${a[0]}"><span class="ic" aria-hidden="true">🏅</span><b>${a[1]}</b><span class="pg">${ok ? "✓ 達成" : `${n}/${a[5]}`}</span><small>${a[2]}</small>${ok ? "" : `<span class="bar"><i style="width:${Math.round((n / a[5]) * 100)}%"></i></span>`}</div>`; }).join("")}</div>`).join("")}
+    ${footer()}`);
+  $("back").onclick = home; bindFooter(); toTop();
+}
+const ymOf = (k) => k.slice(0, 7);
+const ymAdd = (ym, n) => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + n, 1)).toISOString().slice(0, 7);
+const lvOf = (rec) => (rec && Array.isArray(rec.m) ? starsOf(sumOf(rec)) : 1);
+function cal(ym) {
+  const s = load(), k = todayKey(), late = lateDays(s, k), st = streak(s.days);
+  if (!ym || ym > ymOf(k)) ym = ymOf(k);
+  if (ym < ymOf(EPOCH)) ym = ymOf(EPOCH);
+  const y = +ym.slice(0, 4), m = +ym.slice(5, 7), dow = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), n = new Date(Date.UTC(y, m, 0)).getUTCDate(), cells = [];
+  for (let i = 0; i < dow; i++) cells.push(`<span class="c off"></span>`);
+  for (let d = 1; d <= n; d++) {
+    const key = `${ym}-${String(d).padStart(2, "0")}`, rec = s.days[key], ar = (s.adays || {})[key], hd = s.hdays[key] ? `<span class="hd">上</span>` : "";
+    if (rec) { const lv = lvOf(rec); cells.push(`<span class="c p${lv}" data-k="${key}" aria-label="${m}月${d}日 星${lv}つ">${d}<i>${"★".repeat(lv)}</i>${hd}</span>`); }
+    else if (ar) cells.push(`<span class="c late" data-k="${key}" aria-label="${m}月${d}日 あとから遊んだ">${d}<i>↺</i></span>`);
+    else if (late.includes(key)) { const go = s.runs[runKey("a", key)]; cells.push(`<button class="c miss" data-k="${key}" aria-label="${m}月${d}日をあとから遊ぶ${go ? "（続きから）" : ""}">${d}<i>${go ? "続き" : "▶"}</i></button>`); }
+    else cells.push(`<span class="c${key === k ? " today" : ""}" data-k="${key}">${d}</span>`);
+  }
+  draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>カレンダー${st >= 1 ? `<small>連続 ${st}日・合わせて ${playedDays(s)}日</small>` : playedDays(s) ? `<small>合わせて ${playedDays(s)}日</small>` : ""}</h1></header>
+    <div class="calnav"><button class="sub" id="prev" aria-label="前の月"${ym <= ymOf(EPOCH) ? " disabled" : ""}>‹</button><b>${y}年${m}月</b><button class="sub" id="next" aria-label="次の月"${ym >= ymOf(k) ? " disabled" : ""}>›</button></div>
+    <div class="cal">${["日", "月", "火", "水", "木", "金", "土"].map((w) => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>
+    <div class="legend"><span><em style="background:var(--ok)"></em>★★★ まちがいなし</span><span><em style="background:#e5d9a8"></em>★★ 1〜2回</span><span>↺ あとから</span><span>上 上級</span></div>
+    ${late.length ? `<p class="note">▶ の日は、その日の道をあとから歩けます（過去7日まで・連続の日には数えません）。</p>` : ""}
+    ${footer()}`);
+  $("back").onclick = home; $("prev").onclick = () => cal(ymAdd(ym, -1)); $("next").onclick = () => cal(ymAdd(ym, 1));
+  document.querySelectorAll(".cal .miss").forEach((b) => (b.onclick = () => (lateDays(load()).includes(b.dataset.k) ? startRun("a", b.dataset.k) : cal(ym))));
+  bindFooter(); toTop();
+}
+// 研究で分かっていることを、言い切らずに伝える（医療の効果はうたわない）
+function about() {
+  draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>このゲームについて</h1></header>
+    <div class="about" id="about">
+      <h3>頭を使う習慣づくりに</h3>
+      <p>地図を見て道順を覚え、目印を手がかりに同じ道をたどります。最後に、曲がった角の目印をあとから思い出します。時間制限はありません。</p>
+      <h3>研究で分かっていること</h3>
+      <ul>
+        <li>WHO（世界保健機関）の指針（2019年）は、頭の訓練を「勧めてもよい」としています。ただし根拠の確かさは「とても低い〜低い」とされています。</li>
+        <li>認知症になる危険を下げると考えられているのは、運動・血圧の管理・禁煙・聞こえの手当て・人との交流など、暮らし全体の習慣です。</li>
+        <li>画面の中で道を探す練習を続けた人は、海馬（場所の記憶にかかわる脳の部分）の大きさが保たれていた、という小さな研究があります。ただ、人数が少なく、病気を防げるかは分かっていません。</li>
+        <li>道を覚えるときは、曲がる角の目印を手がかりにする方法がよく使われます。</li>
+      </ul>
+      <p>このゲームは医療機器ではなく、認知症を予防したり治したりするものではありません。散歩や家族・友人とのおしゃべりと、いっしょにどうぞ。気になることがあれば、かかりつけの医師に相談してください。</p>
+      <p>出典：<a href="https://www.who.int/publications/i/item/9789241550543" target="_blank" rel="noopener">WHO 2019 指針</a>・<a href="https://doi.org/10.1016/S0140-6736(24)01296-0" target="_blank" rel="noopener">Lancet 委員会 2024</a>・<a href="https://pubmed.ncbi.nlm.nih.gov/21497950/" target="_blank" rel="noopener">Lövdén ほか 2012</a>・<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6048192/" target="_blank" rel="noopener">目印を使う道の覚え方</a></p>
+    </div>${footer()}`);
+  $("back").onclick = home; bindFooter(); toTop();
+}
+
+window.__mm = { mode: () => MODE, load, save, merge, todayKey, dayNo, lateDays, ACH, achGot, nextAch, tally, shareText, streak, cur: () => cur, play: (m) => { if (m) MODE = m; play(); }, home, cal, EPOCH, KEY };
+home();
+if ("serviceWorker" in navigator && location.protocol === "https:" && /github\.io$/.test(location.hostname)) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
