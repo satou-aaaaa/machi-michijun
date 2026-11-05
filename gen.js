@@ -109,7 +109,8 @@
     return [...trips, makeRecall(R, 0, trips)];
   }
   // 練習・とことん（毎回ちがう。ブラウザの乱数を使う）
-  const freeWalk = (n) => walk(Math.random, n, []);
+  // 道が作れなかったら作り直し、それでもだめなら曲がる回数を1つ減らす（練習・とことんを止めない）
+  const freeWalk = (n) => { for (let k = n; ; k--) for (let i = 0; i < 3; i++) { try { return walk(Math.random, k, []); } catch (e) { if (k <= 1 && i === 2) throw e; } } };
   const TIP_OF = (k, EPOCH) => TIPS[Math.max(0, Math.round((Date.parse(k) - Date.parse(EPOCH)) / 864e5)) % TIPS.length];
 
   root.MM = { MARKS, BY, IDS, TIPS, TIP_OF, seedOf, rng, shuffled, sizeFor, blocksAt, turnWord, makeRoute, makeRecall, dailyList, hardList, freeWalk, words, dirWord, DAILY, HARD };

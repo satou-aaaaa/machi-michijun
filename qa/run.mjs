@@ -130,7 +130,7 @@ async function recallRight(p, mode) {
 }
 try {
   // 3-1 今日の道を通しで
-  const p = await newPage();
+  const p = await newPage({ time: "2026-11-05T03:00:00Z" }); // 実行日に関係なく 2026-11-05 として遊ぶ（あとのカレンダーの検査がこの日を当てにする）
   await p.goto(url);
   check("はじめて開くと遊び方が出る", await p.locator("#howto[open]").count() === 1);
   await p.click("#howto-ok");
@@ -144,7 +144,8 @@ try {
   // まっすぐでない角は数えない
   const diag = [r0.path[0][0] === 0 ? 1 : r0.path[0][0] - 1, r0.path[0][1] === 0 ? 1 : r0.path[0][1] - 1];
   await p.click(nodeSel(diag));
-  check("ななめの角を押しても、まちがいに数えず、押し方を知らせる", (await runOf(p, "d")).cur?.miss === undefined || (await runOf(p, "d")).cur.miss === 0, await p.textContent("#msg"));
+  { const dr = await runOf(p, "d"), dm = await p.textContent("#msg");
+    check("ななめの角を押しても、まちがいに数えず、押し方を知らせる", (dr.cur?.miss ?? 0) === 0 && /まっすぐ進める角/.test(dm), dm); }
   // 道でない向きへ1つ進む → まちがい
   const p0 = r0.path[0], p1 = r0.path[1];
   const wrongNb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [p0[0] + dx, p0[1] + dy]).find(([x, y]) => x >= 0 && y >= 0 && x < r0.cols && y < r0.rows && !(x === p1[0] && y === p1[1]));
@@ -204,6 +205,7 @@ try {
   // 3-2 上級：ことばが出ない・6列×7行・思い出しは9つ
   await p.click("#go-h");
   check("上級：道順のことばを出さず、地図は6列×7行（42の交差点）", await p.locator("#ways").count() === 0 && await p.locator("#map .blk.ring").count() === 0);
+  check("上級：覚え方のコツに例（曲がる向きの並び）を出さない", await p.locator("#tip .ex").count() === 0);
   await p.click("#ready");
   check("上級：交差点は42", await p.locator("#map .nd").count() === 42);
   await walkRight(p, "h"); await p.click("#next"); await p.click("#ready"); await walkRight(p, "h"); await p.click("#next");
@@ -253,6 +255,26 @@ try {
   const rb = await runOf(pA, "p");
   check("古いタブ：別のタブで新しい回を始めたら、古い画面の押した角は書き込まない", rb.id !== before && !(rb.cur && rb.cur.pos), JSON.stringify(rb.cur));
   await pB.close();
+
+  // 3-6b 3回続けてまちがえると次の角が光る・別のタブで歩き終えた回を古いタブで戻さない・引き継ぎの数に文字が入っていても画面で動かさない
+  {
+    const w = await newPage({ time: "2026-11-05T03:00:00Z" });
+    await w.goto(url); await w.evaluate(() => localStorage.setItem("michijun-v1", JSON.stringify({ v: 1, tut: true }))); await w.reload(); await w.click("#go-p"); await w.click('[data-n="2"]'); await w.click("#ready");
+    const r = (await runOf(w, "p")).list[0], [x0, y0] = r.path[0], [x1, y1] = r.path[1];
+    const bad = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [x0 + dx, y0 + dy]).find(([x, y]) => x >= 0 && y >= 0 && x < r.cols && y < r.rows && !(x === x1 && y === y1));
+    for (let n = 0; n < 3; n++) await w.click(nodeSel(bad));
+    const c3 = (await runOf(w, "p")).cur;
+    check("3回続けてまちがえると、ヒントなしでも次の角が光る", c3.hints === 0 && c3.miss === 3 && await w.locator("#map .nd.glow").count() === 1, JSON.stringify(c3));
+    await w.evaluate(() => { const s = __mm.load(); s.runs.p.cur.stage = "done"; localStorage.setItem(__mm.KEY, JSON.stringify(s)); });
+    await w.click(nodeSel(bad));
+    check("古いタブ：別のタブで歩き終えた回を、歩く途中に戻さない", (await runOf(w, "p")).cur.stage === "done");
+    const m = await w.evaluate(() => { const done = { mode: "d", date: "2026-11-05", id: "x", list: [{}], res: [{ k: "walk", m: 0, h: 0 }], cur: null }; return __mm.merge({ v: 1, t: 2, runs: { d: done } }, { v: 1, t: 1, runs: {} }).runs.d; });
+    check("保存に失敗したあと合わせても、終えた回は結果の画面まで残す（初回の判定と Ko-fi の1行を消さない）", m && m.id === "x");
+    await w.evaluate(() => localStorage.setItem(__mm.KEY, JSON.stringify({ v: 1, tut: true, ebest: '<img src=x onerror="window.__x=1">', steps: "9<b>", runs: [] })));
+    await w.reload(); await w.waitForTimeout(100);
+    check("引き継ぎで入った記録の数に文字が入っていても、画面で動かさない（数にそろえる）", await w.evaluate(() => window.__x === undefined && !document.querySelector("img[src=x]") && __mm.load().ebest === 0 && typeof __mm.load().runs === "object" && !Array.isArray(__mm.load().runs)));
+    await w.context().close();
+  }
 
   // 3-7 カレンダーとあとから（1週間あと）
   const q = await newPage({ time: "2026-11-12T03:00:00Z" });

@@ -374,7 +374,8 @@ const recOf = (r) => { const b = r.res.filter((x) => x.k === "walk"), rc = r.res
 const runKey = (mode, date) => (mode === "a" ? "a:" + date : mode);
 const bookOf = (s, m) => (m === "d" ? s.days : m === "h" ? s.hdays : m === "a" ? (s.adays = s.adays || {}) : null);
 // 終わった今日・上級・あとからの回を日ごとの記録に入れる（同じ日の今日とあとからは、どちらか一方だけ）
-function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || b[r.date] || (r.mode === "a" && s.days[r.date]) || (r.mode === "d" && s.adays[r.date])) return false; b[r.date] = recOf(r); return true; }
+const canBank = (s, r) => { const b = doneOf(r) ? bookOf(s, r.mode) : null; return !!b && !b[r.date] && !(r.mode === "a" && s.days[r.date]) && !(r.mode === "d" && s.adays[r.date]); };
+function bank(s, r) { if (!canBank(s, r)) return false; bookOf(s, r.mode)[r.date] = recOf(r); return true; }
 // 2つの記録を合わせる（保存に失敗したあとのメモリと保存。両方を fresh() で補ってから。日ごとの記録・帳は合わせ、数は多いほう。途中経過は同じ回なら進んだほう）
 const prog = (r) => (r.res ? r.res.length : 0) * 1000 + (r.cur ? ({ watch: 0, walk: 1, recall: 1 }[r.cur.stage] || 0) * 500 + (r.cur.pos || 0) * 10 + (r.cur.sel ? r.cur.sel.length : 0) + (r.cur.miss || 0) + (r.cur.hints || 0) : 0);
 function merge(a, b) {
@@ -391,8 +392,8 @@ function merge(a, b) {
   const ra = a.runs || {}, rb = b.runs || {}; s.runs = Object.assign({}, n.runs);
   for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) {
     const x = ra[m], y = rb[m];
-    if (!x || !y) { const r = x || y; if (!r) continue; if (bank(s, r) || doneOf(r)) { delete s.runs[m]; continue; } const bd = bookOf(s, r.mode); if (!bd || !bd[r.date]) s.runs[m] = r; continue; }
-    if (x.id !== y.id) { const [w, l] = (x.date || "") >= (y.date || "") ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; }
+    if (!x || !y) { const r = x || y; if (!r) continue; if (doneOf(r)) { if (canBank(s, r) || !bookOf(s, r.mode)) s.runs[m] = r; else delete s.runs[m]; continue; } const bd = bookOf(s, r.mode); if (!bd || !bd[r.date]) s.runs[m] = r; continue; }
+    if (x.id !== y.id) { const dx = x.date || "", dy = y.date || "", [w, l] = dx !== dy ? (dx > dy ? [x, y] : [y, x]) : n === a ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; }
     else { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; }
   }
   return s;
@@ -402,9 +403,10 @@ function load() {
   try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {}
   if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null;
-  if (!a || !b) return Object.assign(fresh(), a || b || {});
-  return merge(a, b);
+  return clean(!a || !b ? Object.assign(fresh(), a || b || {}) : merge(a, b));
 }
+// 引き継ぎで入った記録も、画面に出す数は数にそろえる（文字が入っていても画面で動かさない）
+function clean(s) { for (const k of ["ebest", "walks", "steps"]) { const n = Math.floor(Number(s[k])); s[k] = Number.isFinite(n) && n > 0 ? n : 0; } for (const k of ["days", "hdays", "adays", "dex", "runs", "kofi"]) if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; return s; }
 // 保存の前に読み直す（別のタブで進めた記録を消さない）
 function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
 function streak(days) { let k = todayKey(), n = 0; if (!days[k]) k = prevDay(k); while (days[k]) { n++; k = prevDay(k); } return n; }
@@ -449,7 +451,7 @@ const buzz = (n = 12) => { try { navigator.vibrate && !document.documentElement.
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const draw = (h) => { VIEW++; app.innerHTML = h; };
 const calm = () => document.documentElement.classList.contains("a11y-calm") || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" id="f-about">このゲームについて</a><a href="#" data-a11y-open>見やすさ</a><a href="#" data-hk>引き継ぎ</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a><a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi で応援</a></footer>`;
+const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" id="f-about">このゲームについて</a><a href="#" data-a11y-open>見やすさ</a><a href="#" data-hk>引き継ぎ</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a></footer>`;
 function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.preventDefault(); openHow(); }; const a = $("f-about"); if (a) a.onclick = (e) => { e.preventDefault(); about(); }; }
 function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
 $("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
@@ -525,7 +527,7 @@ function startRun(mode, opt) {
 let cur = null;
 const same = (r) => r && cur && r.id === cur.id && r.res.length === cur.i; // 保存した進み具合が、この画面と同じ回か
 // 途中の様子を保存する（ヒント・まちがいの数は、別のタブで数えた分より減らさない）
-function keep() { save((s) => { const r = s.runs[MODE]; if (!same(r)) return; const w = r.cur && r.cur.i === cur.i ? r.cur : null; if (w) { for (const q of ["miss", "hints"]) cur[q] = Math.max(cur[q] || 0, w[q] || 0); if (w.stage === cur.stage && (w.pos || 0) > cur.pos) cur.pos = w.pos; } r.cur = { i: cur.i, stage: cur.stage, pos: cur.pos, miss: cur.miss, hints: cur.hints, wrong: cur.wrong, sel: cur.sel.slice() }; }); }
+function keep() { save((s) => { const r = s.runs[MODE]; if (!same(r)) return; const w = r.cur && r.cur.i === cur.i ? r.cur : null; if (w && w.stage === "done" && cur.stage !== "done") return; if (w) { for (const q of ["miss", "hints"]) cur[q] = Math.max(cur[q] || 0, w[q] || 0); if (w.stage === cur.stage && (w.pos || 0) > cur.pos) cur.pos = w.pos; } r.cur = { i: cur.i, stage: cur.stage, pos: cur.pos, miss: cur.miss, hints: cur.hints, wrong: cur.wrong, sel: cur.sel.slice() }; }); }
 function play() {
   const s = load(), run = s.runs[MODE];
   if (!run) return home();
@@ -571,7 +573,7 @@ function placeWho(trip, i) { const w = $("who"); if (!w) return; const [x, y] = 
 // 1. 道順を見る（何度でも。時間制限なし）
 function watchView(run, trip) {
   const hard = run.mode === "h";
-  const tip = run.mode === "p" || run.mode === "e" ? MM.TIPS[(run.res.length + run.id.length) % MM.TIPS.length] : MM.TIP_OF(run.date, EPOCH), ex = tip.ex(trip);
+  const tip = run.mode === "p" || run.mode === "e" ? MM.TIPS[(run.res.length + run.id.length) % MM.TIPS.length] : MM.TIP_OF(run.date, EPOCH), ex = hard ? "" : tip.ex(trip);
   draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
     <p class="big" data-a11y-say>家から <b>${BY[trip.goal].e} ${BY[trip.goal].n}</b> へ</p>
     ${mapHtml(trip, { rings: hard ? [] : trip.turns.map((t) => t.m), flag: true })}
