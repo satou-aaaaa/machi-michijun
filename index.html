@@ -405,9 +405,13 @@ function load() {
   try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {}
   if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null;
+  a = dropBadRuns(a); b = dropBadRuns(b);
   return clean(!a || !b ? Object.assign(fresh(), a || b || {}) : merge(a, b));
 }
 // 引き継ぎで入った記録も、画面に出す数は数にそろえる（文字が入っていても画面で動かさない）
+// 形の合わない途中経過（引き継ぎで入った手作りのコードなど）は、その回だけ外す（記録は残す）
+const runOk = (r) => !!r && typeof r === "object" && Array.isArray(r.res) && Array.isArray(r.list);
+function dropBadRuns(s) { if (s && s.runs && typeof s.runs === "object") for (const m of Object.keys(s.runs)) if (!runOk(s.runs[m])) delete s.runs[m]; return s; }
 function clean(s) { for (const k of ["ebest", "walks", "steps"]) { const n = Math.floor(Number(s[k])); s[k] = Number.isFinite(n) && n > 0 ? n : 0; } for (const k of ["days", "hdays", "adays", "dex", "runs", "kofi"]) if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; return s; }
 // 保存の前に読み直す（別のタブで進めた記録を消さない）
 function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }

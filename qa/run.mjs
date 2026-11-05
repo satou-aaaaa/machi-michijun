@@ -271,6 +271,9 @@ try {
     const m = await w.evaluate(() => { const done = { mode: "d", date: "2026-11-05", id: "x", list: [{}], res: [{ k: "walk", m: 0, h: 0 }], cur: null }; return __mm.merge({ v: 1, t: 2, runs: { d: done } }, { v: 1, t: 1, runs: {} }).runs.d; });
     check("保存に失敗したあと合わせても、終えた回は結果の画面まで残す（初回の判定と Ko-fi の1行を消さない）", m && m.id === "x");
     await w.evaluate(() => localStorage.setItem(__mm.KEY, JSON.stringify({ v: 1, tut: true, ebest: '<img src=x onerror="window.__x=1">', steps: "9<b>", runs: [] })));
+    await w.evaluate(() => localStorage.setItem(__mm.KEY, JSON.stringify({ v: 1, tut: true, days: { "2026-11-01": { m: [0], h: [0], r: [1, 1, 0] } }, runs: { d: { mode: "d", date: "2026-11-05", res: [] }, h: "x" } })));
+    await w.reload(); await w.waitForTimeout(100);
+    check("引き継ぎで入った途中経過の形が合わなくても、ホームが開き、その回だけ外して記録は残す", await w.locator("#go-d").count() === 1 && await w.evaluate(() => { const s = __mm.load(); return !s.runs.d && !s.runs.h && !!s.days["2026-11-01"]; }));
     await w.reload(); await w.waitForTimeout(100);
     check("引き継ぎで入った記録の数に文字が入っていても、画面で動かさない（数にそろえる）", await w.evaluate(() => window.__x === undefined && !document.querySelector("img[src=x]") && __mm.load().ebest === 0 && typeof __mm.load().runs === "object" && !Array.isArray(__mm.load().runs)));
     await w.context().close();
