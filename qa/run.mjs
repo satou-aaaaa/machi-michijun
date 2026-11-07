@@ -337,6 +337,7 @@ check("画面のエラーが出ない", errors.length === 0, errors.slice(0, 5).
 // 保存に失敗したら知らせる（2026-11-07 暑さ指数よみで見つけた。黙って記録が消えないように）
 { const ps = await browser.newPage(); await ps.goto(url); await ps.waitForTimeout(200);
   check("保存に失敗したら、保存できるまで知らせ続け、保存できたら消す", await ps.evaluate(async () => { const orig = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; save(() => {}); save(() => {}); const one = document.querySelectorAll("#savewarn").length === 1 && document.getElementById("savewarn").textContent.includes("保存できませんでした"); await new Promise((r) => setTimeout(r, 2500)); const stay = !!document.getElementById("savewarn"); Storage.prototype.setItem = orig; save(() => {}); return one && stay && !document.getElementById("savewarn"); }));
+  check("保存できない帯は画面のいちばん上に場所を取り（ボタンに重ならない）、読み上げの知らせにも出す", await ps.evaluate(() => { const orig = Storage.prototype.setItem; Storage.prototype.setItem = function () { throw new Error("full"); }; save(() => {}); const b = document.getElementById("savewarn"); const top = !!b && document.body.firstElementChild === b && getComputedStyle(b).position === "sticky"; const l = document.getElementById("live"); const live = !l || l.textContent.includes("保存できませんでした"); Storage.prototype.setItem = orig; save(() => {}); return top && live && !document.getElementById("savewarn"); }));
   await ps.close(); }
 await browser.close();
 server.close();
