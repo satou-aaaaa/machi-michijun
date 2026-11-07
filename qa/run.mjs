@@ -136,6 +136,8 @@ try {
   await p.keyboard.press("Escape"); await p.waitForTimeout(100); check("遊び方を Esc で閉じられる", await p.locator("#howto[open]").count() === 0);
   await p.reload(); await p.waitForTimeout(200); check("遊び方を Esc で閉じても、開き直したとき出ない", await p.locator("#howto[open]").count() === 0);
   await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await p.click("#howto-ok"); await p.reload(); await p.waitForTimeout(200); check("遊び方を「わかった」で閉じてすぐ読み直しても出ない", await p.locator("#howto[open]").count() === 0);
+  { let again = 0; for (let i = 0; i < 10; i++) { await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await p.keyboard.press("Escape"); await p.reload(); await p.waitForTimeout(200); again += await p.locator("#howto[open]").count(); } check("遊び方を Esc で閉じてすぐ読み直しても出ない（10回）", again === 0); }
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); check("「わかった」を押したその場で「見た」が残る", await p.locator("#howto-ok").evaluate((b) => { b.click(); return Object.keys(localStorage).some((k) => { try { return JSON.parse(localStorage.getItem(k)).tut === true; } catch { return false; } }); }));
   check("ホーム：題・今日の道のボタン・文字の大きさ3段・見やすさ・引き継ぎ", await p.locator("h1.title").textContent() === "町の道順" && await p.locator("#go-d").count() && await p.locator("[data-fs]").count() === 3 && await p.locator("[data-a11y-open]").count() && await p.locator("[data-hk]").count());
   await p.click("#go-d");
   check("見る画面：道順のことば（○○の角を右）・もう一度見る・覚え方のコツ・目印の輪", await p.locator("#ways li").count() === 3 && /の角を(右|左)/.test(await p.locator("#ways").textContent()) && await p.locator("#again").count() && await p.locator("#tip").count() && await p.locator("#map .blk.ring").count() === 2);
