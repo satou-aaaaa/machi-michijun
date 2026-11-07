@@ -133,7 +133,9 @@ try {
   const p = await newPage({ time: "2026-11-05T03:00:00Z" }); // 実行日に関係なく 2026-11-05 として遊ぶ（あとのカレンダーの検査がこの日を当てにする）
   await p.goto(url);
   check("はじめて開くと遊び方が出る", await p.locator("#howto[open]").count() === 1);
-  await p.click("#howto-ok");
+  await p.keyboard.press("Escape"); await p.waitForTimeout(100); check("遊び方を Esc で閉じられる", await p.locator("#howto[open]").count() === 0);
+  await p.reload(); await p.waitForTimeout(200); check("遊び方を Esc で閉じても、開き直したとき出ない", await p.locator("#howto[open]").count() === 0);
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await p.click("#howto-ok"); await p.reload(); await p.waitForTimeout(200); check("遊び方を「わかった」で閉じてすぐ読み直しても出ない", await p.locator("#howto[open]").count() === 0);
   check("ホーム：題・今日の道のボタン・文字の大きさ3段・見やすさ・引き継ぎ", await p.locator("h1.title").textContent() === "町の道順" && await p.locator("#go-d").count() && await p.locator("[data-fs]").count() === 3 && await p.locator("[data-a11y-open]").count() && await p.locator("[data-hk]").count());
   await p.click("#go-d");
   check("見る画面：道順のことば（○○の角を右）・もう一度見る・覚え方のコツ・目印の輪", await p.locator("#ways li").count() === 3 && /の角を(右|左)/.test(await p.locator("#ways").textContent()) && await p.locator("#again").count() && await p.locator("#tip").count() && await p.locator("#map .blk.ring").count() === 2);
