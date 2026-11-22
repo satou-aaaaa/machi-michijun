@@ -14,6 +14,7 @@ import { checkSwStall } from "./sw-check.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const results = [];
 const check = (name, ok, detail = "") => results.push({ name, ok: !!ok, detail: String(detail).slice(0, 600) });
+const firstClose = async (q) => { if (await q.locator("#howto[open]").count()) await q.click("#howto-ok"); if (await q.locator("#core-coach").count()) { await q.evaluate(() => Core.coach.leave()); await q.waitForTimeout(100); } }; // はじめての練習の吹き出しをやめてホームへ（sync-template の migrateFirstQa が足した）
 const M = createRequire(import.meta.url)(path.join(root, "gen.js"));
 const dayKey = (n) => new Date(Date.UTC(2026, 10, 5 + n)).toISOString().slice(0, 10);
 
@@ -134,17 +135,17 @@ try {
   // 3-1 今日の道を通しで
   const p = await newPage({ time: "2026-11-05T03:00:00Z" }); // 実行日に関係なく 2026-11-05 として遊ぶ（あとのカレンダーの検査がこの日を当てにする）
   await p.goto(url);
-  check("はじめて開くと遊び方が出る", await p.locator("#howto[open]").count() === 1);
+  check("はじめて開くと遊び方が出る", await p.locator("#core-coach").count() === 1);
   await p.keyboard.press("Escape"); await p.waitForTimeout(100); check("遊び方を Esc で閉じられる", await p.locator("#howto[open]").count() === 0);
   await p.reload(); await p.waitForTimeout(200); check("遊び方を Esc で閉じても、開き直したとき出ない", await p.locator("#howto[open]").count() === 0);
-  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await p.click("#howto-ok"); await p.reload(); await p.waitForTimeout(200); check("遊び方を「わかった」で閉じてすぐ読み直しても出ない", await p.locator("#howto[open]").count() === 0);
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await firstClose(p); await p.reload(); await p.waitForTimeout(200); check("遊び方を「わかった」で閉じてすぐ読み直しても出ない", await p.locator("#howto[open]").count() === 0);
   { let again = 0; for (let i = 0; i < 10; i++) { await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); await p.keyboard.press("Escape"); await p.reload(); await p.waitForTimeout(200); again += await p.locator("#howto[open]").count(); } check("遊び方を Esc で閉じてすぐ読み直しても出ない（10回）", again === 0); }
   { const c = await browser.newContext(); const r = await c.newPage(); const big = []; // 題が h1{flex:1} で縦に伸び（伸びない形と比べて4pxより高ければ失敗）、iPad の縦で大きなすき間が出た（shared-workflows incidents/2026-11-07-title-stretched.md）
     for (const [w, h] of [[820, 1180], [390, 844], [1280, 800]]) { await r.setViewportSize({ width: w, height: h }); await r.goto(url); await r.waitForTimeout(200); await r.keyboard.press("Escape"); await r.waitForTimeout(100);
       const v = await r.evaluate(() => { const e = [...document.querySelectorAll(".title")].find((x) => x.offsetParent); if (!e) return null; const h = e.getBoundingClientRect().height; const f = e.style.flex; e.style.flex = "none"; const n = e.getBoundingClientRect().height; e.style.flex = f; return h - n; });
       if (v === null || v > 4) big.push(`${w}x${h}:${v === null ? "題なし" : "+" + Math.round(v) + "px"}`); }
     check("ホームの題は縦長の画面でも縦に伸びない（820×1180・390×844・1280×800）", big.length === 0, big.join(" ")); await c.close(); }
-  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); check("「わかった」を押したその場で「見た」が残る", await p.locator("#howto-ok").evaluate((b) => { b.click(); return Object.keys(localStorage).some((k) => { try { return JSON.parse(localStorage.getItem(k)).tut === true; } catch { return false; } }); }));
+  await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200); check("はじめての練習が始まったその場で「見た」が残る", await p.evaluate(() => { return Object.keys(localStorage).some((k) => { try { return JSON.parse(localStorage.getItem(k)).tut === true; } catch { return false; } }); })); await firstClose(p);
   check("ホーム：題・今日の道のボタン・文字の大きさ3段・見やすさ・引き継ぎ", await p.locator("h1.title").textContent() === "町の道順" && await p.locator("#go-d").count() && await p.locator("[data-fs]").count() === 3 && await p.locator("[data-a11y-open]").count() && await p.locator("[data-hk]").count());
   await p.click("#go-d");
   check("見る画面：道順のことば（○○の角を右）・もう一度見る・覚え方のコツ・目印の輪", await p.locator("#ways li").count() === 3 && /の角を(右|左)/.test(await p.locator("#ways").textContent()) && await p.locator("#again").count() && await p.locator("#tip").count() && await p.locator("#map .blk.ring").count() === 2);
@@ -310,7 +311,7 @@ try {
 
   // 3-8 幅320px：横にはみ出さない・押す所は44px以上・上級の交差点の間も44px以上
   const w = await newPage({ w: 320 });
-  await w.goto(url); await w.click("#howto-ok");
+  await w.goto(url); await firstClose(w);
   const tooSmall = async () => w.$$eval("button, a", (bs) => bs.filter((b) => b.offsetParent && !b.closest("dialog") && !b.closest(".cal")).map((b) => [b.textContent.trim().slice(0, 12), Math.round(b.getBoundingClientRect().height), Math.round(b.getBoundingClientRect().width)]).filter(([, h, wd]) => h < 44 || wd < 44));
   check("幅320px：ホームが横にはみ出さず、押す所は44px以上", (await w.evaluate(() => document.documentElement.scrollWidth)) <= 320 && (await tooSmall()).length === 0, JSON.stringify(await tooSmall()));
   await w.evaluate(() => { const s = __mm.load(); s.tut = true; localStorage.setItem("michijun-v1", JSON.stringify(s)); });
@@ -329,7 +330,7 @@ try {
   check("色の見分けを助ける設定で、道の線の色を青と橙に替える", /html\.a11y-cvd\{--route:#a34a00/.test(html));
 
   // 3-10 引き継ぎ
-  await checkTransfer({ browser, url, game: "machi-michijun", sample: { "michijun-v1": JSON.stringify({ ...s1, tut: true }), "michijun-fs": "3" }, check, open: async (pg) => { if (await pg.locator("#howto[open]").count()) await pg.click("#howto-ok"); } });
+  await checkTransfer({ browser, url, game: "machi-michijun", sample: { "michijun-v1": JSON.stringify({ ...s1, tut: true }), "michijun-fs": "3" }, check, open: async (pg) => { await firstClose(pg); } });
 } catch (e) {
   check("ブラウザで通しで遊ぶ（途中で止まった）", false, e.stack || String(e));
 }
