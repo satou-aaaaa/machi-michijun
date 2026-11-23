@@ -329,6 +329,16 @@ try {
   check("色だけで分けない：たどった線は点線、まちがいの角は✕、思い出しは✓・✕・点線の枠", /\.wk\{[^}]*stroke-dasharray:3\.2 2/.test(html) && /\.nd\.ng::after\{content:"✕"/.test(html) && /\.item\.got::after\{content:"✓"/.test(html) && /\.item\.miss\{outline:4px dashed/.test(html));
   check("色の見分けを助ける設定で、道の線の色を青と橙に替える", /html\.a11y-cvd\{--route:#a34a00/.test(html));
 
+  // 3-9b スマホの「戻る」：ホームから別の画面を開いて戻ると、ゲームから出ずにホームへ（Core.screens.mark・route。shared-workflows routines/ui-rules.md「ページの分け方」6）
+  { const pb = await newPage(); await pb.goto(url); await pb.locator("#core-coach").waitFor({ timeout: 3000 }).catch(() => {}); await pb.keyboard.press("Escape"); await pb.waitForTimeout(100);
+    const r = {}, atHome = async () => (await pb.locator("h1.title").isVisible()) && (await pb.locator("#go-d").isVisible());
+    await pb.click("#go-dex"); r.dex = new URL(pb.url()).hash;
+    await pb.goBack(); await pb.waitForSelector("#go-d", { timeout: 3000 }); r.back1 = pb.url() === url; r.home1 = await atHome();
+    await pb.click("#go-d"); await pb.waitForSelector("#map"); r.play = new URL(pb.url()).hash;
+    await pb.goBack(); await pb.waitForSelector("#go-d", { timeout: 3000 }); r.back2 = pb.url() === url; r.home2 = await atHome();
+    check("スマホの「戻る」：目印帳・遊ぶ画面から戻ると、ゲームのページのままホームに戻る", r.dex === "#dex" && r.play === "#play" && r.back1 && r.back2 && r.home1 && r.home2, JSON.stringify(r));
+    await pb.context().close(); }
+
   // 3-10 引き継ぎ
   await checkTransfer({ browser, url, game: "machi-michijun", sample: { "michijun-v1": JSON.stringify({ ...s1, tut: true }), "michijun-fs": "3" }, check, open: async (pg) => { await firstClose(pg); } });
 } catch (e) {

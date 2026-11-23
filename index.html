@@ -358,7 +358,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
 // ゲームの共通部品 game-core。ひな形: satou-aaaaa/shared-workflows の template/core/core.js。
 // ゲームでは直さない。index.html の core:begin〜core:end の印のあいだに node scripts/sync-template.mjs <ゲームのフォルダ> で写す
 // （ファイルを足さないので sw.js の SHELL は変えない）。ゲームからは window.Core で使う。
-// 共通部品の版: 3
+// 共通部品の版: 4
 //   1: 2026-11-21 ゲームごとに手で写していた小さな関数を1か所に集めた。40本で同じ役目の関数が何通りにも分かれ
 //      （お知らせの帯 11通り・振動 10通り・文字を安全にする esc 4通り・数の読み込み num 2通り）、
 //      「動きを減らす」でも振動する・お知らせが読み上げられない・num の直し（#410）が22本に届かない・esc が " を変えない、が起きていた
@@ -368,6 +368,10 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
 //   3: 2026-11-22 吹き出しを出しているあいだ 0.4 秒ごとに場所を測り直す（古い場所に残って押す所を隠すことがあった）。ボタンの字を「案内を閉じる」に。
 //      段の wait（その所が出るまで待つ）を足した。全ゲームの「はじめての練習」を sync-template の migrateFirstPlay が足すため
 //   2: 2026-11-22 感想フォームのゲーム名を、渡さなければ題（<title>）から入れる。sync-template が全ゲームを game-core に切り替える（migrateCore）ため
+//   4: 2026-11-23 画面の切り替え（Core.screens）を足した。1ページに全部を縦に積んで見づらくなるのを、単体の HTML のまま
+//      URL の #（例 #kiroku）で画面を分けて止める（routines/ui-rules.md U10〜U12。NN/g「Progressive Disclosure」・Android「Layouts and navigation patterns」）。
+//      <section data-screen="home">〜 を置いたページだけで動く（置いていないゲームでは何もしない）
+//      JS で描き替えるゲームは、画面の関数の最初で Core.screens.mark("dex")、起動時に Core.screens.route({...}, home) で「戻る」がホームへ戻る
 // 決まり: 外へ通信しない。ゲームの関数の名前（toast・buzz など）は上書きしない（Core.toast などで呼ぶ）。
 (function () {
   "use strict";
@@ -563,6 +567,103 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
     return { start, stop, leave, active: () => !!steps, step: () => (steps ? i : -1) };
   })();
 
+  // ---- 画面の切り替え（1つの HTML を # で画面に分ける。routines/ui-rules.md U10〜U12）----
+  // 書き方: <section data-screen="home" data-title="ホーム">…</section><section data-screen="kiroku" data-title="記録" hidden>…</section>
+  //         入口は <a href="#kiroku">記録</a>。戻るボタン・ブラウザの「戻る」で前の画面へ戻る。最初の data-screen がホーム。
+  // 画面が変わると、その画面の最初の見出しへフォーカスを移し（読み上げのため）、上までもどし、"core:screen" を知らせる（detail.id）。
+  // ゲームから: Core.screens.go("kiroku")・Core.screens.now()・Core.screens.list()
+  // screens.js（単体の部品）を先に読んだページでは、それを使う（2回つながない）
+  const screens = window.Screens || (function () {
+    // screens:begin（template/screens/screens.js と同じ中身。check-core が比べる。直すときは両方を同じに）
+    const all = () => (doc.querySelectorAll ? [...doc.querySelectorAll("[data-screen]")] : []);
+    const ids = () => all().map((e) => e.getAttribute("data-screen"));
+    let cur = "";
+    let baseTitle = "";
+    function want() {
+      let h = "";
+      try { h = decodeURIComponent((location.hash || "").slice(1)); } catch (e) { h = ""; }
+      const list = ids();
+      return list.includes(h) ? h : list[0] || "";
+    }
+    function show(id, first) {
+      const list = all();
+      if (!list.length) return;
+      const el = list.find((e) => e.getAttribute("data-screen") === id) || list[0];
+      id = el.getAttribute("data-screen");
+      for (const e of list) e.hidden = e !== el;
+      const t = el.getAttribute("data-title");
+      if (!baseTitle) baseTitle = doc.title;
+      doc.title = t && id !== list[0].getAttribute("data-screen") ? `${t}｜${baseTitle}` : baseTitle;
+      const changed = cur !== id;
+      cur = id;
+      if (!changed || first) { if (changed) fire(id); return; }
+      try { scrollTo(0, 0); } catch (e) { /* 古いブラウザ */ }
+      const h = el.querySelector("h1,h2,[data-screen-focus]");
+      if (h) { if (!h.hasAttribute("tabindex")) h.setAttribute("tabindex", "-1"); try { h.focus({ preventScroll: true }); } catch (e) { /* 無視 */ } }
+      fire(id);
+    }
+    function fire(id) { try { doc.dispatchEvent(new CustomEvent("core:screen", { detail: { id } })); } catch (e) { /* 古いブラウザ */ } }
+    function go(id) {
+      if (!ids().includes(id)) return;
+      if (want() === id) return show(id);
+      location.hash = id === ids()[0] ? "" : id; // ホームは # を付けない（共有したURLがホームになる）
+    }
+    function init() {
+      if (!all().length) return;
+      // ゲームの CSS が section に display を書いていても、隠した画面は出さない
+      const st = doc.createElement("style");
+      st.textContent = "[data-screen][hidden]{display:none!important}";
+      doc.head.appendChild(st);
+      addEventListener("hashchange", () => show(want()));
+      show(want(), true);
+    }
+    if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", init); else init();
+    // ---- JS で描き替える画面（ゲームの帳・カレンダー・実績など）を # と「戻る」につなぐ ----
+    // ゲームは画面を app.innerHTML で描き替えるので、そのままでは「戻る」でゲームから出てしまう。
+    // 使い方: 画面を描く関数の最初で Core.screens.mark("dex")（ホームは mark("")）。起動時に一度
+    //         Core.screens.route({ dex: book, cal: () => cal(), ach: achView }, home)。
+    // 履歴はいつも [ホーム] か [ホーム, #画面] の2つまで（画面から画面へは置き換え、ホームへは戻す）。開き直すとホームから。
+    const views = new Map(); // Map にする（# から来た名前で Object の関数を呼ばない。CodeQL js/unvalidated-dynamic-method-call）
+    let homeFn = null, pushed = false, skipPop = 0, quiet = false;
+    const hashName = () => { try { return decodeURIComponent((location.hash || "").slice(1)); } catch (e) { return ""; } };
+    const bare = () => location.pathname + location.search;
+    // # が画面の名前でないとき（引き継ぎの #hk=… など、ほかの部品の印）は触らない
+    const foreign = () => { const h = hashName(); return !!h && !/^[A-Za-z][\w-]*$/.test(h); };
+    function mark(name) {
+      if (quiet || all().length || !homeFn) return; // data-screen のページ・route の前・戻るで描いている最中は何もしない
+      name = name || "";
+      if (foreign()) return;
+      const now = hashName();
+      if (now === name) return;
+      try {
+        if (!name) {
+          if (pushed) { pushed = false; skipPop++; history.back(); } else history.replaceState(null, "", bare());
+        } else if (!now) { history.pushState(null, "", "#" + encodeURIComponent(name)); pushed = true; }
+        else history.replaceState(null, "", "#" + encodeURIComponent(name));
+      } catch (e) { /* 使えない */ }
+      fire(name || "home");
+    }
+    function onPop() {
+      if (skipPop) { skipPop--; return; }
+      if (foreign()) return;
+      const h = hashName();
+      const fn = (h && views.get(h)) || homeFn;
+      if (!h || !views.has(h)) pushed = false;
+      quiet = true;
+      try { if (fn) fn(); } finally { quiet = false; }
+    }
+    function route(map, home) {
+      if (all().length) return;
+      for (const k of Object.keys(map || {})) if (typeof map[k] === "function") views.set(k, map[k]);
+      // 何度呼んでもよい（ゲームの home() の最初で呼ぶ）。# を消すのは最初の1回だけ（開き直したらホームから。途中の回は続きから出る）
+      if (!homeFn) { addEventListener("popstate", onPop); if (hashName() && !foreign()) try { history.replaceState(null, "", bare()); } catch (e) { /* 使えない */ } }
+      homeFn = home;
+    }
+    return { go, now: () => cur, list: ids, show: (id) => show(id), mark, route };
+    // screens:end
+  })();
+  window.Screens = screens;
+
   // ---- 感想・不具合のフォーム（全ゲームで1つの Googleフォーム。事前入力のリンクでゲーム名と付属情報を入れる）----
   // 送る人が入力するのは「内容」の1か所だけ（必須はそれだけ）。名前・メール・遊んだ記録の中身は入れない。
   // 付属情報はフォームに見える形で入り、送る前に本人が消せる。フォームの entry 番号は Googleフォームの「事前入力した URL を取得」で確かめたもの
@@ -624,7 +725,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
     }, true);
   }
 
-  window.Core = { v: 3, calm, esc, num, jstNow, today, addDays, prevDay, nextDay, md, dayNo, ymOf, ymAdd, untilNext, streak, say, toast, buzz, saveWarn, coach, feedbackUrl, feedbackInfo, bindFeedback };
+  window.Core = { v: 4, calm, esc, num, jstNow, today, addDays, prevDay, nextDay, md, dayNo, ymOf, ymAdd, untilNext, streak, say, toast, buzz, saveWarn, coach, feedbackUrl, feedbackInfo, bindFeedback, screens };
 })();
 </script>
 <!-- core:end -->
@@ -775,6 +876,7 @@ const markBtn = (id, cls = "") => { const it = BY[id]; return `<button class="it
 const toTop = () => window.scrollTo(0, 0);
 
 function home() {
+  Core.screens.route({ practice: practiceMenu, dex: dexView, ach: achView, cal: () => cal(), about }, home); Core.screens.mark("");
   const s = load(), k = todayKey(), done = s.days[k], hdone = s.hdays[k];
   // 最後まで遊んで結果を見る前に閉じた回は、開き直したら結果へ進める（記録をつける）
   for (const m of Object.keys(s.runs)) { const r = s.runs[m]; if (m !== "p" && r && doneOf(r)) { MODE = m; return finish(); } }
@@ -807,6 +909,7 @@ function home() {
   if (!s.tut) firstPlay();
 }
 function practiceMenu() {
+  Core.screens.mark("practice");
   draw(`<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（目印帳には載ります）</small></h1></header>
     <p class="note">曲がる回数を選んでください。</p>
     <div class="lens">${[2, 3, 4, 5, 6, 7].map((n) => `<button class="sub" data-n="${n}" style="min-height:72px;font-size:1.05rem">${n}回曲がる</button>`).join("")}</div>
@@ -913,6 +1016,7 @@ function placeWho(trip, i) { const w = $("who"); if (!w) return; const [x, y] = 
 
 // 1. 道順を見る（何度でも。時間制限なし）
 function watchView(run, trip) {
+  Core.screens.mark("play");
   const hard = run.mode === "h";
   const tip = run.mode === "p" || run.mode === "e" ? MM.TIPS[(run.res.length + run.id.length) % MM.TIPS.length] : MM.TIP_OF(run.date, EPOCH), ex = hard ? "" : tip.ex(trip);
   draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
@@ -942,6 +1046,7 @@ function animate(trip) {
 
 // 2. たどる：次に進む角を押す。まっすぐ先の角なら、あいだの角を飛ばして押してよい（曲がる角では止まる）
 function walkView(run, trip) {
+  Core.screens.mark("play");
   draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
     <p class="big" data-a11y-say>家から <b>${BY[trip.goal].e} ${BY[trip.goal].n}</b> へ</p>
     ${mapHtml(trip, { nodes: true, flag: true })}
@@ -1000,6 +1105,7 @@ function tapNode(x, y, trip, b) {
 }
 // 1本の道を終える：結果を入れ、目印帳に目印を足す
 function endTrip(trip) {
+  Core.screens.mark("play");
   let r = null;
   const s = save((s) => {
     r = s.runs[MODE]; if (!same(r)) { r = null; return; }
@@ -1031,6 +1137,7 @@ function endTrip(trip) {
 }
 // 3. 思い出し：1本目の道で曲がった角の目印を、全部選んで「これで決める」
 function recallView(run, trip) {
+  Core.screens.mark("play");
   draw(`${headOf(run, "最後の思い出し")}
     <p class="big" style="font-size:1.15rem" data-a11y-say>1本目の道で、曲がった角にあった目印は？</p>
     <p class="note">${trip.items.length}か所あります。全部選んで「これで決める」を押してください。押し直すと外せます。</p>
@@ -1071,6 +1178,7 @@ function finish() {
   result(run.mode, run.date, first, null, newAch);
 }
 function endFinish(run) {
+  Core.screens.mark("result");
   const n = Math.max(0, ...run.res.map((x, j) => (x.m === 0 && x.h === 0 ? run.list[j].turns.length : 0))); let newAch = [];
   save((s2) => { const c = s2.runs.e; if (c && c.id === run.id) delete s2.runs.e; if (Array.isArray(run.a0)) newAch = achGot(s2).filter((id) => !run.a0.includes(id)); });
   const s = load();
@@ -1091,6 +1199,7 @@ const shareMarks = (rec) => rec.m.map((m, j) => sq(m + rec.h[j])).join("") + ` �
 function shareText(mode, k, rec) { return `町の道順${mode === "h" ? " 上級" : ""} 第${dayNo(k)}日 ${md(k)}\n🗺️${shareMarks(rec)}${sumOf(rec) === 0 && fullRecall(rec) ? " 迷わず" : ""}`; }
 function untilNext() { const n = jstNow(), ms = 864e5 - (n.getTime() % 864e5); return `${Math.floor(ms / 36e5)}時間${Math.floor((ms % 36e5) / 6e4)}分`; }
 function result(mode, k, first, prec, newAch = []) {
+  Core.screens.mark("result");
   const s = load(), list = mode === "p" ? prec.list : listOf(mode === "a" ? "d" : mode, k), rec = mode === "p" ? prec : bookOf(s, mode)[k];
   if (!rec) return home();
   const walks = list.filter((t) => t.k === "walk"), total = sumOf(rec), late = mode === "a", text = shareText(mode, k, rec);
@@ -1130,6 +1239,7 @@ function result(mode, k, first, prec, newAch = []) {
 
 // ---- 目印帳・実績・カレンダー・このゲームについて ----
 function dexView() {
+  Core.screens.mark("dex");
   const s = load(), n = IDS.filter((x) => s.dex[x]).length;
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>目印帳<small>${n}/${IDS.length}か所</small></h1></header>
     <p class="note">曲がった角と目的地の目印が集まります。数字は通った回数です。</p>
@@ -1138,6 +1248,7 @@ function dexView() {
   $("back").onclick = home; bindFooter(); toTop();
 }
 function achView() {
+  Core.screens.mark("ach");
   const s = load(), t = tally(s), got = achGot(s);
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>実績<small>${got.length}/${ACH.length}</small></h1></header>
     ${AGRP.map((g, gi) => `<p class="agrp">${g}</p><div class="alist">${ACH.filter((a) => a[3] === gi).map((a) => { const ok = got.includes(a[0]), n = Math.min(t[a[4]], a[5]); return `<div class="ach${ok ? " got" : ""}" data-id="${a[0]}"><span class="ic" aria-hidden="true">🏅</span><b>${a[1]}</b><span class="pg">${ok ? "✓ 達成" : `${n}/${a[5]}`}</span><small>${a[2]}</small>${ok ? "" : `<span class="bar"><i style="width:${Math.round((n / a[5]) * 100)}%"></i></span>`}</div>`; }).join("")}</div>`).join("")}
@@ -1148,6 +1259,7 @@ const ymOf = Core.ymOf;
 const ymAdd = Core.ymAdd;
 const lvOf = (rec) => (rec && Array.isArray(rec.m) ? starsOf(sumOf(rec)) : 1);
 function cal(ym) {
+  Core.screens.mark("cal");
   const s = load(), k = todayKey(), late = lateDays(s, k), st = streak(s.days);
   if (!ym || ym > ymOf(k)) ym = ymOf(k);
   if (ym < ymOf(EPOCH)) ym = ymOf(EPOCH);
@@ -1172,6 +1284,7 @@ function cal(ym) {
 }
 // 研究で分かっていることを、言い切らずに伝える（医療の効果はうたわない）
 function about() {
+  Core.screens.mark("about");
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>このゲームについて</h1></header>
     <div class="about" id="about">
       <h3>頭を使う習慣づくりに</h3>
