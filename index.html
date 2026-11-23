@@ -623,7 +623,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
     // 使い方: 画面を描く関数の最初で Core.screens.mark("dex")（ホームは mark("")）。起動時に一度
     //         Core.screens.route({ dex: book, cal: () => cal(), ach: achView }, home)。
     // 履歴はいつも [ホーム] か [ホーム, #画面] の2つまで（画面から画面へは置き換え、ホームへは戻す）。開き直すとホームから。
-    const views = {};
+    const views = new Map(); // Map にする（# から来た名前で Object の関数を呼ばない。CodeQL js/unvalidated-dynamic-method-call）
     let homeFn = null, pushed = false, skipPop = 0, quiet = false;
     const hashName = () => { try { return decodeURIComponent((location.hash || "").slice(1)); } catch (e) { return ""; } };
     const bare = () => location.pathname + location.search;
@@ -647,14 +647,16 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
       if (skipPop) { skipPop--; return; }
       if (foreign()) return;
       const h = hashName();
-      const fn = (h && views[h]) || homeFn;
-      if (!h || !views[h]) pushed = false;
+      const own = !!h && views.has(h);
+      if (!own) pushed = false;
+      // CodeQL js/unvalidated-dynamic-method-call：# から選んだものは has で確かめ、関数かどうかも見てから呼ぶ
+      const fn = own ? views.get(h) : homeFn;
       quiet = true;
-      try { if (fn) fn(); } finally { quiet = false; }
+      try { if (typeof fn === "function") fn(); } finally { quiet = false; }
     }
     function route(map, home) {
       if (all().length) return;
-      Object.assign(views, map || {});
+      for (const k of Object.keys(map || {})) if (typeof map[k] === "function") views.set(k, map[k]);
       // 何度呼んでもよい（ゲームの home() の最初で呼ぶ）。# を消すのは最初の1回だけ（開き直したらホームから。途中の回は続きから出る）
       if (!homeFn) { addEventListener("popstate", onPop); if (hashName() && !foreign()) try { history.replaceState(null, "", bare()); } catch (e) { /* 使えない */ } }
       homeFn = home;
@@ -876,6 +878,7 @@ const markBtn = (id, cls = "") => { const it = BY[id]; return `<button class="it
 const toTop = () => window.scrollTo(0, 0);
 
 function home() {
+  Core.screens.route({ practice: practiceMenu, dex: dexView, ach: achView, cal: () => cal(), about }, home); Core.screens.mark("");
   const s = load(), k = todayKey(), done = s.days[k], hdone = s.hdays[k];
   // 最後まで遊んで結果を見る前に閉じた回は、開き直したら結果へ進める（記録をつける）
   for (const m of Object.keys(s.runs)) { const r = s.runs[m]; if (m !== "p" && r && doneOf(r)) { MODE = m; return finish(); } }
@@ -908,6 +911,7 @@ function home() {
   if (!s.tut) firstPlay();
 }
 function practiceMenu() {
+  Core.screens.mark("practice");
   draw(`<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（目印帳には載ります）</small></h1></header>
     <p class="note">曲がる回数を選んでください。</p>
     <div class="lens">${[2, 3, 4, 5, 6, 7].map((n) => `<button class="sub" data-n="${n}" style="min-height:72px;font-size:1.05rem">${n}回曲がる</button>`).join("")}</div>
@@ -1014,6 +1018,7 @@ function placeWho(trip, i) { const w = $("who"); if (!w) return; const [x, y] = 
 
 // 1. 道順を見る（何度でも。時間制限なし）
 function watchView(run, trip) {
+  Core.screens.mark("play");
   const hard = run.mode === "h";
   const tip = run.mode === "p" || run.mode === "e" ? MM.TIPS[(run.res.length + run.id.length) % MM.TIPS.length] : MM.TIP_OF(run.date, EPOCH), ex = hard ? "" : tip.ex(trip);
   draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
@@ -1043,6 +1048,7 @@ function animate(trip) {
 
 // 2. たどる：次に進む角を押す。まっすぐ先の角なら、あいだの角を飛ばして押してよい（曲がる角では止まる）
 function walkView(run, trip) {
+  Core.screens.mark("play");
   draw(`${headOf(run, tripLabel(run, trip))}${stepBar()}
     <p class="big" data-a11y-say>家から <b>${BY[trip.goal].e} ${BY[trip.goal].n}</b> へ</p>
     ${mapHtml(trip, { nodes: true, flag: true })}
@@ -1101,6 +1107,7 @@ function tapNode(x, y, trip, b) {
 }
 // 1本の道を終える：結果を入れ、目印帳に目印を足す
 function endTrip(trip) {
+  Core.screens.mark("play");
   let r = null;
   const s = save((s) => {
     r = s.runs[MODE]; if (!same(r)) { r = null; return; }
@@ -1132,6 +1139,7 @@ function endTrip(trip) {
 }
 // 3. 思い出し：1本目の道で曲がった角の目印を、全部選んで「これで決める」
 function recallView(run, trip) {
+  Core.screens.mark("play");
   draw(`${headOf(run, "最後の思い出し")}
     <p class="big" style="font-size:1.15rem" data-a11y-say>1本目の道で、曲がった角にあった目印は？</p>
     <p class="note">${trip.items.length}か所あります。全部選んで「これで決める」を押してください。押し直すと外せます。</p>
@@ -1172,6 +1180,7 @@ function finish() {
   result(run.mode, run.date, first, null, newAch);
 }
 function endFinish(run) {
+  Core.screens.mark("result");
   const n = Math.max(0, ...run.res.map((x, j) => (x.m === 0 && x.h === 0 ? run.list[j].turns.length : 0))); let newAch = [];
   save((s2) => { const c = s2.runs.e; if (c && c.id === run.id) delete s2.runs.e; if (Array.isArray(run.a0)) newAch = achGot(s2).filter((id) => !run.a0.includes(id)); });
   const s = load();
@@ -1192,6 +1201,7 @@ const shareMarks = (rec) => rec.m.map((m, j) => sq(m + rec.h[j])).join("") + ` �
 function shareText(mode, k, rec) { return `町の道順${mode === "h" ? " 上級" : ""} 第${dayNo(k)}日 ${md(k)}\n🗺️${shareMarks(rec)}${sumOf(rec) === 0 && fullRecall(rec) ? " 迷わず" : ""}`; }
 function untilNext() { const n = jstNow(), ms = 864e5 - (n.getTime() % 864e5); return `${Math.floor(ms / 36e5)}時間${Math.floor((ms % 36e5) / 6e4)}分`; }
 function result(mode, k, first, prec, newAch = []) {
+  Core.screens.mark("result");
   const s = load(), list = mode === "p" ? prec.list : listOf(mode === "a" ? "d" : mode, k), rec = mode === "p" ? prec : bookOf(s, mode)[k];
   if (!rec) return home();
   const walks = list.filter((t) => t.k === "walk"), total = sumOf(rec), late = mode === "a", text = shareText(mode, k, rec);
@@ -1231,6 +1241,7 @@ function result(mode, k, first, prec, newAch = []) {
 
 // ---- 目印帳・実績・カレンダー・このゲームについて ----
 function dexView() {
+  Core.screens.mark("dex");
   const s = load(), n = IDS.filter((x) => s.dex[x]).length;
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>目印帳<small>${n}/${IDS.length}か所</small></h1></header>
     <p class="note">曲がった角と目的地の目印が集まります。数字は通った回数です。</p>
@@ -1239,6 +1250,7 @@ function dexView() {
   $("back").onclick = home; bindFooter(); toTop();
 }
 function achView() {
+  Core.screens.mark("ach");
   const s = load(), t = tally(s), got = achGot(s);
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>実績<small>${got.length}/${ACH.length}</small></h1></header>
     ${AGRP.map((g, gi) => `<p class="agrp">${g}</p><div class="alist">${ACH.filter((a) => a[3] === gi).map((a) => { const ok = got.includes(a[0]), n = Math.min(t[a[4]], a[5]); return `<div class="ach${ok ? " got" : ""}" data-id="${a[0]}"><span class="ic" aria-hidden="true">🏅</span><b>${a[1]}</b><span class="pg">${ok ? "✓ 達成" : `${n}/${a[5]}`}</span><small>${a[2]}</small>${ok ? "" : `<span class="bar"><i style="width:${Math.round((n / a[5]) * 100)}%"></i></span>`}</div>`; }).join("")}</div>`).join("")}
@@ -1249,6 +1261,7 @@ const ymOf = Core.ymOf;
 const ymAdd = Core.ymAdd;
 const lvOf = (rec) => (rec && Array.isArray(rec.m) ? starsOf(sumOf(rec)) : 1);
 function cal(ym) {
+  Core.screens.mark("cal");
   const s = load(), k = todayKey(), late = lateDays(s, k), st = streak(s.days);
   if (!ym || ym > ymOf(k)) ym = ymOf(k);
   if (ym < ymOf(EPOCH)) ym = ymOf(EPOCH);
@@ -1273,6 +1286,7 @@ function cal(ym) {
 }
 // 研究で分かっていることを、言い切らずに伝える（医療の効果はうたわない）
 function about() {
+  Core.screens.mark("about");
   draw(`<header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>このゲームについて</h1></header>
     <div class="about" id="about">
       <h3>頭を使う習慣づくりに</h3>
